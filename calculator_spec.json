@@ -27,9 +27,9 @@
   },
   "workflow": {
     "mode": "autonomous",
-    "stage": "verify_feishu_access",
-    "last_verified_action": "The clinical user entered the Feishu App Secret and Base link in Streamlit Secrets on 2026-07-15. The app reads its configuration, and Feishu custom app cli_aadce4499bb9dbd9 version 1.0.1 is published, audit-approved, and has the Robot capability plus the seven minimal Base table/field/record read-write scopes. A synthetic upsert still returns Forbidden because this user-owned Base has not yet added the custom app as a document application collaborator.",
-    "pending_human_gate": "add_published_feishu_app_as_managing_document_application_to_the_user_owned_base",
+    "stage": "complete_test_prototype",
+    "last_verified_action": "On 2026-07-15, the clinical user added the published custom app as a document application collaborator in the user-owned Base. The public Streamlit app successfully created the seven non-destructive Base tables and wrote a synthetic patient SYN-PT-20260715-01. An immediate second sync also succeeded using the same stable clinical ID, verifying the update path rather than blind append behavior.",
+    "pending_human_gate": "none_for_test_prototype; future clinic release requires production privacy, access-control, and governance confirmation",
     "confirmed_decisions": [
       "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
       "Clinical user supplied and authorized the Chinese VISA-P questionnaire for direct in-app use on 2026-07-14",
@@ -67,8 +67,13 @@
       "user_owned_feishu_base_created",
       "streamlit_feishu_secret_and_base_link_entered",
       "feishu_robot_capability_published_and_approved",
-      "synthetic_feishu_upsert_attempted_and_forbidden_diagnosed"
+      "synthetic_feishu_upsert_attempted_and_forbidden_diagnosed",
+      "feishu_document_application_manage_access_granted",
+      "synthetic_feishu_seven_table_schema_verified",
+      "synthetic_feishu_first_upsert_verified",
+      "synthetic_feishu_repeat_stable_id_upsert_verified",
+      "all_21_automated_tests_passed_after_deployment"
     ],
-    "next_automatic_action": "After the clinical user adds the published custom app as a document application with manage access in the user-owned Base, retry the synthetic seven-table Feishu upsert, repeat it to verify stable-ID deduplication, and record the verified result."
+    "next_automatic_action": "When converting this test prototype to clinic use, make the repository and deployment private, restrict app access, define retention and access roles, review patient-data hosting agreements, and rotate production secrets before entering real patient data."
   }
 }
