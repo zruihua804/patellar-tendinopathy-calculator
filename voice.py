@@ -111,7 +111,10 @@ def parse_rom_dictation(transcript: str) -> VoiceParseResult:
 
     extension = _single_value(
         "伸展受限角度",
-        _number_matches(rf"(?:伸展|伸直)(?:受限|不足|差|缺失)(?:为|是|约|大约)?\s*([{_NUMBER_CHARS}]+)\s*(?:度|°)", clean),
+        _number_matches(
+            rf"(?:伸不直|伸不开|伸展(?:受限|不足|差|缺失|活动度)?|伸直(?:受限|不足|差|缺失)?)(?:为|是|约|大约)?\s*([{_NUMBER_CHARS}]+)\s*(?:度|°)",
+            clean,
+        ),
         warnings,
     )
     if extension is not None:

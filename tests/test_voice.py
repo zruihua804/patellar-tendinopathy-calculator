@@ -22,6 +22,12 @@ class VoiceParsingTests(unittest.TestCase):
         self.assertEqual(parsed.values["knee_extension_deficit_deg"], 0.0)
         self.assertEqual(parsed.values["rom_method"], "倾角仪")
 
+    def test_parses_plain_extension_and_colloquial_extension_deficit(self):
+        plain = parse_rom_dictation("左膝主动屈曲120度，伸展0度，量角器测量")
+        colloquial = parse_rom_dictation("右膝屈曲一百三十度，伸不开五度")
+        self.assertEqual(plain.values["knee_extension_deficit_deg"], 0.0)
+        self.assertEqual(colloquial.values["knee_extension_deficit_deg"], 5.0)
+
     def test_conflicting_modes_are_not_written(self):
         parsed = parse_rom_dictation("左膝主动屈曲一百二十度，被动屈曲一百三十度")
         self.assertNotIn("rom_mode", parsed.values)

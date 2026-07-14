@@ -68,7 +68,7 @@
             .trim();
           if (transcript) {
             emit({ event_id: eventId(), kind: "final_transcript", transcript });
-            setIdle("已获得文字，正在等待临床人员确认字段。");
+            setIdle("已获得文字；请在下方审核区核对并确认字段。");
           }
         };
         instance.onerror = (event) => {

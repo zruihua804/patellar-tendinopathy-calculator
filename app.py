@@ -248,6 +248,7 @@ def clear_voice_review() -> None:
 def prepare_voice_review(transcript: str) -> None:
     parsed = parse_rom_dictation(transcript)
     st.session_state.voice_review_transcript = parsed.transcript
+    st.session_state.voice_review_transcript_editor = parsed.transcript
     st.session_state.voice_review_warnings = list(parsed.uncertainties)
     st.session_state.voice_review_fields = list(parsed.values)
     for field, value in parsed.values.items():
@@ -273,14 +274,27 @@ def render_cloud_rom_voice_entry() -> None:
         st.warning(st.session_state.voice_review_error)
         del st.session_state.voice_review_error
 
-    fields = st.session_state.get("voice_review_fields", [])
-    if not fields:
+    transcript = str(st.session_state.get("voice_review_transcript", ""))
+    if not transcript:
         return
 
-    st.info("语音结果尚未写入。请逐项核对后再确认；确认前可直接修改。")
-    st.caption(f"本次文字：{st.session_state.get('voice_review_transcript', '')}")
+    st.info("已收到语音文字；结果尚未写入。请核对后再确认。")
+    edited_transcript = st.text_area(
+        "转写原文（仅本次审核使用，不会保存）",
+        key="voice_review_transcript_editor",
+        help="如浏览器转写有误，可在这里更正后重新解析。",
+    )
+    if st.button("根据校正文字重新解析 ROM", key="reparse_voice_rom"):
+        prepare_voice_review(edited_transcript)
+        st.rerun()
+
+    fields = st.session_state.get("voice_review_fields", [])
     for warning in st.session_state.get("voice_review_warnings", []):
         st.warning(warning)
+
+    if not fields:
+        st.caption("尚未提取到可写入的 ROM 字段。可更正上方文字后重新解析，或直接在下方手工录入。")
+        return
 
     review_left, review_right = st.columns(2)
     with review_left:
