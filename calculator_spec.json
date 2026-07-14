@@ -27,9 +27,9 @@
   },
   "workflow": {
     "mode": "autonomous",
-    "stage": "authorize",
-    "last_verified_action": "Public Streamlit prototype is live at https://patellar-tendinopathy-calculator.streamlit.app/; Feishu custom app cli_aadce4499bb9dbd9 was published with the seven minimal Base table/field/record read-write scopes, and a user-owned blank Base was created on 2026-07-14. App Secret and the Base link remain intentionally unrecorded until entered through Streamlit secret management.",
-    "pending_human_gate": "secure_feishu_secret_and_base_link_entry",
+    "stage": "verify_feishu_access",
+    "last_verified_action": "The clinical user entered the Feishu App Secret and Base link in Streamlit Secrets on 2026-07-15. The app reads its configuration, and Feishu custom app cli_aadce4499bb9dbd9 version 1.0.1 is published, audit-approved, and has the Robot capability plus the seven minimal Base table/field/record read-write scopes. A synthetic upsert still returns Forbidden because this user-owned Base has not yet added the custom app as a document application collaborator.",
+    "pending_human_gate": "add_published_feishu_app_as_managing_document_application_to_the_user_owned_base",
     "confirmed_decisions": [
       "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
       "Clinical user supplied and authorized the Chinese VISA-P questionnaire for direct in-app use on 2026-07-14",
@@ -64,8 +64,11 @@
       "public_streamlit_prototype_deployed",
       "feishu_custom_app_created_and_published",
       "feishu_minimal_bitable_scopes_authorized",
-      "user_owned_feishu_base_created"
+      "user_owned_feishu_base_created",
+      "streamlit_feishu_secret_and_base_link_entered",
+      "feishu_robot_capability_published_and_approved",
+      "synthetic_feishu_upsert_attempted_and_forbidden_diagnosed"
     ],
-    "next_automatic_action": "After the clinical user enters the Feishu App Secret and created Base link in Streamlit Secrets, verify a synthetic seven-table Feishu upsert and repair any configuration error."
+    "next_automatic_action": "After the clinical user adds the published custom app as a document application with manage access in the user-owned Base, retry the synthetic seven-table Feishu upsert, repeat it to verify stable-ID deduplication, and record the verified result."
   }
 }
