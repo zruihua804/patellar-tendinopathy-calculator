@@ -1,0 +1,65 @@
+{
+  "condition": "髌腱病（Patellar tendinopathy）",
+  "primary_outcome": "12周 VISA-P 总分相对基线的变化；重返活动状态和指定负荷活动疼痛为次要结局（待临床确认）",
+  "timepoints": [
+    "基线",
+    "6周",
+    "12周",
+    "6个月",
+    "12个月"
+  ],
+  "roles": [
+    "doctor",
+    "therapist",
+    "patient",
+    "research"
+  ],
+  "model_status": "data_collection_and_trend_tracking_no_individual_probability",
+  "storage": "user_owned_feishu_base",
+  "save_behavior": "upsert_by_stable_clinical_id",
+  "raw_json_columns": false,
+  "voice_input": {
+    "mode": "cloud_browser_speech_recognition",
+    "audio_retention": false,
+    "requires_field_confirmation": true,
+    "scope": "therapist-initiated short ROM dictation only; no continuous listening or patient interview recording",
+    "implementation": "browser-native SpeechRecognition using push-to-talk; final transcript is transient and is parsed locally into reviewable ROM fields"
+  },
+  "workflow": {
+    "mode": "autonomous",
+    "stage": "local_prototype_verified",
+    "last_verified_action": "21 deterministic tests, browser rendering of the cloud push-to-talk control, synthetic full-record upsert across all seven tables, and desktop/mobile interface checks passed on 2026-07-14",
+    "pending_human_gate": "production_access",
+    "confirmed_decisions": [
+      "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
+      "Clinical user supplied and authorized the Chinese VISA-P questionnaire for direct in-app use on 2026-07-14",
+      "Patient information screenshot import will use in-process local OCR with review-before-apply and no image retention",
+      "Cloud voice is authorized for direct web use by the clinical user on 2026-07-14, limited to therapist push-to-talk ROM dictation; no continuous recording, patient interview recording, or application audio retention"
+    ],
+    "assumptions_pending_clinical_signoff": [
+      "Target population: adults or near-adults with clinician-diagnosed or strongly suspected patellar tendinopathy",
+      "Primary outcome: 12-week VISA-P total change from baseline",
+      "PROM mode: authorized Chinese VISA-P item display and scoring",
+      "Production storage: user-owned Feishu Base after local prototype verification"
+    ],
+    "completed_checks": [
+      "planning_scaffold_created",
+      "clinical_workflow_designed",
+      "longitudinal_data_contract_designed",
+      "evidence_review_completed",
+      "prediction_model_claim_assessed",
+      "clinical_signoff_received_for_scope_and_questionnaire",
+      "screenshot_import_architecture_confirmed",
+      "local_prototype_built",
+      "authorized_chinese_visa_p_scoring_tested",
+      "screenshot_review_before_apply_tested",
+      "synthetic_end_to_end_storage_tested",
+      "desktop_and_mobile_ui_checked",
+      "secret_configuration_checked",
+      "cloud_voice_boundary_confirmed",
+      "cloud_voice_component_rendered",
+      "cloud_voice_structured_parser_tested"
+    ],
+    "next_automatic_action": "await the consolidated production-access authorization before deploying the web app or connecting it to a real Feishu Base"
+  }
+}

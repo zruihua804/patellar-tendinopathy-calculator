@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: light; }
+      body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f2937; }
+      #wrap { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+      button { border: 0; border-radius: 9px; background: #0f766e; color: white; font-weight: 650; font-size: 14px; padding: 11px 15px; cursor: pointer; touch-action: none; }
+      button.recording { background: #b91c1c; }
+      button:disabled { background: #9ca3af; cursor: not-allowed; }
+      #status { font-size: 13px; line-height: 1.4; color: #4b5563; }
+      #status.error { color: #b91c1c; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <button id="record" type="button">按住说话录入 ROM</button>
+      <span id="status">正在检查浏览器语音功能…</span>
+    </div>
+    <script>
+      const button = document.getElementById("record");
+      const status = document.getElementById("status");
+      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      let recording = false;
+      let config = { language: "zh-CN" };
+
+      function notify(type, data = {}) {
+        window.parent.postMessage({ isStreamlitMessage: true, type, ...data }, "*");
+      }
+      function resize() { notify("streamlit:setFrameHeight", { height: 58 }); }
+      function setStatus(message, isError = false) {
+        status.textContent = message;
+        status.className = isError ? "error" : "";
+      }
+      function eventId() {
+        return window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      }
+      function emit(value) { notify("streamlit:setComponentValue", { value }); }
+
+      function setIdle(message = "按住按钮开始；松开后转写。音频不会传到本应用服务器或保存。") {
+        recording = false;
+        button.classList.remove("recording");
+        button.textContent = "按住说话录入 ROM";
+        setStatus(message);
+      }
+
+      function createRecognition() {
+        if (!Recognition) return null;
+        const instance = new Recognition();
+        instance.lang = config.language || "zh-CN";
+        instance.continuous = false;
+        instance.interimResults = false;
+        instance.maxAlternatives = 1;
+        instance.onstart = () => {
+          recording = true;
+          button.classList.add("recording");
+          button.textContent = "松开结束录入";
+          setStatus("正在聆听；松开按钮后结束。", false);
+        };
+        instance.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .filter((result) => result.isFinal)
+            .map((result) => result[0].transcript)
+            .join(" ")
+            .trim();
+          if (transcript) {
+            emit({ event_id: eventId(), kind: "final_transcript", transcript });
+            setIdle("已获得文字，正在等待临床人员确认字段。");
+          }
+        };
+        instance.onerror = (event) => {
+          const message = event.error === "not-allowed"
+            ? "未获得麦克风权限；可在浏览器地址栏允许后重试，或改用手工录入。"
+            : event.error === "no-speech"
+              ? "未检测到语音；请重新按住说话，或改用手工录入。"
+              : `语音转写不可用（${event.error}）；请改用手工录入。`;
+          emit({ event_id: eventId(), kind: "error", error: message });
+          setIdle(message);
+        };
+        instance.onend = () => { if (recording) setIdle("未获得可用文字；请重试或手工录入。"); };
+        return instance;
+      }
+
+      function start() {
+        if (!Recognition) return;
+        if (recording) return;
+        recognition = createRecognition();
+        try { recognition.start(); } catch (_) { setIdle("语音服务尚未准备好；请稍后重试或手工录入。"); }
+      }
+      function stop() {
+        if (recognition && recording) recognition.stop();
+      }
+
+      if (!Recognition) {
+        button.disabled = true;
+        setStatus("当前浏览器未提供网页语音转写。请使用最新版 Chrome 或 Edge，或手工录入。", true);
+      } else {
+        setIdle();
+        button.addEventListener("pointerdown", (event) => { event.preventDefault(); start(); });
+        ["pointerup", "pointercancel", "pointerleave"].forEach((name) => button.addEventListener(name, stop));
+        document.addEventListener("pointerup", stop);
+      }
+
+      window.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "streamlit:render") {
+          config = { ...config, ...(data.args || {}) };
+        }
+      });
+      notify("streamlit:componentReady", { apiVersion: 1 });
+      resize();
+    </script>
+  </body>
+</html>
