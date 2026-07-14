@@ -28,8 +28,8 @@
   "workflow": {
     "mode": "autonomous",
     "stage": "authorize",
-    "last_verified_action": "Initial private repository published to github.com/zruihua804/patellar-tendinopathy-calculator at commit 124440e; a dedicated SSH key over GitHub port 443 is verified for future pushes on 2026-07-14",
-    "pending_human_gate": "streamlit_and_feishu_production_access",
+    "last_verified_action": "Public Streamlit prototype is live at https://patellar-tendinopathy-calculator.streamlit.app/; Feishu custom app cli_aadce4499bb9dbd9 was published with the seven minimal Base table/field/record read-write scopes, and a user-owned blank Base was created on 2026-07-14. App Secret and the Base link remain intentionally unrecorded until entered through Streamlit secret management.",
+    "pending_human_gate": "secure_feishu_secret_and_base_link_entry",
     "confirmed_decisions": [
       "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
       "Clinical user supplied and authorized the Chinese VISA-P questionnaire for direct in-app use on 2026-07-14",
@@ -60,8 +60,12 @@
       "cloud_voice_component_rendered",
       "cloud_voice_structured_parser_tested",
       "private_github_repository_published",
-      "persistent_ssh_push_path_verified"
+      "persistent_ssh_push_path_verified",
+      "public_streamlit_prototype_deployed",
+      "feishu_custom_app_created_and_published",
+      "feishu_minimal_bitable_scopes_authorized",
+      "user_owned_feishu_base_created"
     ],
-    "next_automatic_action": "open the Streamlit deployment flow, verify account access, and deploy without production secrets before preparing the Feishu authorization batch"
+    "next_automatic_action": "After the clinical user enters the Feishu App Secret and created Base link in Streamlit Secrets, verify a synthetic seven-table Feishu upsert and repair any configuration error."
   }
 }
