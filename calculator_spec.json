@@ -27,9 +27,9 @@
   },
   "workflow": {
     "mode": "autonomous",
-    "stage": "local_prototype_verified",
-    "last_verified_action": "21 deterministic tests, browser rendering of the cloud push-to-talk control, synthetic full-record upsert across all seven tables, and desktop/mobile interface checks passed on 2026-07-14",
-    "pending_human_gate": "production_access",
+    "stage": "authorize",
+    "last_verified_action": "Initial private repository published to github.com/zruihua804/patellar-tendinopathy-calculator at commit 124440e; a dedicated SSH key over GitHub port 443 is verified for future pushes on 2026-07-14",
+    "pending_human_gate": "streamlit_and_feishu_production_access",
     "confirmed_decisions": [
       "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
       "Clinical user supplied and authorized the Chinese VISA-P questionnaire for direct in-app use on 2026-07-14",
@@ -58,8 +58,10 @@
       "secret_configuration_checked",
       "cloud_voice_boundary_confirmed",
       "cloud_voice_component_rendered",
-      "cloud_voice_structured_parser_tested"
+      "cloud_voice_structured_parser_tested",
+      "private_github_repository_published",
+      "persistent_ssh_push_path_verified"
     ],
-    "next_automatic_action": "await the consolidated production-access authorization before deploying the web app or connecting it to a real Feishu Base"
+    "next_automatic_action": "open the Streamlit deployment flow, verify account access, and deploy without production secrets before preparing the Feishu authorization batch"
   }
 }
