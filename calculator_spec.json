@@ -28,7 +28,7 @@
   "workflow": {
     "mode": "autonomous",
     "stage": "complete_test_prototype",
-    "last_verified_action": "On 2026-07-15, the clinical user added the published custom app as a document application collaborator in the user-owned Base. The public Streamlit app successfully created the seven non-destructive Base tables and wrote a synthetic patient SYN-PT-20260715-01. An immediate second sync also succeeded using the same stable clinical ID, verifying the update path rather than blind append behavior.",
+    "last_verified_action": "On 2026-07-15, the clinical user added the published custom app as a document application collaborator in the user-owned Base. The public Streamlit app successfully created the seven non-destructive Base tables and wrote a synthetic patient SYN-PT-20260715-01. An immediate second sync also succeeded using the same stable clinical ID, verifying the update path rather than blind append behavior. The voice review flow was then repaired so every returned transcript is visible and can be corrected and reparsed even when no ROM field was initially recognized.",
     "pending_human_gate": "none_for_test_prototype; future clinic release requires production privacy, access-control, and governance confirmation",
     "confirmed_decisions": [
       "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
@@ -72,7 +72,9 @@
       "synthetic_feishu_seven_table_schema_verified",
       "synthetic_feishu_first_upsert_verified",
       "synthetic_feishu_repeat_stable_id_upsert_verified",
-      "all_21_automated_tests_passed_after_deployment"
+      "all_21_automated_tests_passed_after_deployment",
+      "voice_transcript_review_visibility_and_reparse_fixed",
+      "all_22_automated_tests_passed_after_voice_fix"
     ],
     "next_automatic_action": "When converting this test prototype to clinic use, make the repository and deployment private, restrict app access, define retention and access roles, review patient-data hosting agreements, and rotate production secrets before entering real patient data."
   }
