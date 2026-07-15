@@ -73,7 +73,7 @@
       "all_22_automated_tests_passed_after_voice_fix",
       "voice_entry_removed_from_active_user_interface",
       "ROM_slider_and_VAS_followup_redesign_implemented",
-      "OCR_runtime_dependency_repaired_with_onnxruntime_libgl1_and_libglib2_cloud_packages",
+      "OCR_runtime_dependency_repaired_with_onnxruntime_libgl1_and_debian_t64_glib_cloud_packages",
       "all_26_automated_tests_passed_after_followup_redesign"
     ],
     "next_automatic_action": "When converting this test prototype to clinic use, make the repository and deployment private, restrict app access, define retention and access roles, review patient-data hosting agreements, and rotate production secrets before entering real patient data."
