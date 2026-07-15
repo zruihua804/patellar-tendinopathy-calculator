@@ -14,27 +14,26 @@
     "patient",
     "research"
   ],
-  "model_status": "data_collection_and_trend_tracking_no_individual_probability",
+  "model_status": "literature_calibrated_return_to_sport_communication_reference_and_trend_tracking",
   "storage": "user_owned_feishu_base",
   "save_behavior": "upsert_by_stable_clinical_id",
   "raw_json_columns": false,
   "voice_input": {
-    "mode": "cloud_browser_speech_recognition",
-    "audio_retention": false,
-    "requires_field_confirmation": true,
-    "scope": "therapist-initiated short ROM dictation only; no continuous listening or patient interview recording",
-    "implementation": "browser-native SpeechRecognition using push-to-talk; final transcript is transient and is parsed locally into reviewable ROM fields"
+    "mode": "none",
+    "reason": "Removed from the clinical workflow at the user's request because it was not usable in practice."
   },
   "workflow": {
     "mode": "autonomous",
     "stage": "complete_test_prototype",
-    "last_verified_action": "On 2026-07-15, the clinical user added the published custom app as a document application collaborator in the user-owned Base. The public Streamlit app successfully created the seven non-destructive Base tables and wrote a synthetic patient SYN-PT-20260715-01. An immediate second sync also succeeded using the same stable clinical ID, verifying the update path rather than blind append behavior. The voice review flow was then repaired so every returned transcript is visible and can be corrected and reparsed even when no ROM field was initially recognized.",
+    "last_verified_action": "On 2026-07-15, the clinical user requested a clinician-first redesign: manual slider capture for affected/reference knee, affected hip, and knee-to-wall measures; VAS; auto-generated Feishu/local follow-up charts; a simplified patient-facing return-to-sport comparison; and removal of voice entry. The app now uses a literature-calibrated 24-week communication reference anchored to published progressive tendon-loading trial outcomes, with deliberately small transparent modifiers for current function, pain, symptom duration, and recent rehabilitation adherence. It is not represented as an externally validated prediction model.",
     "pending_human_gate": "none_for_test_prototype; future clinic release requires production privacy, access-control, and governance confirmation",
     "confirmed_decisions": [
       "Clinical scope, red flags, and 12-week VISA-P change as the primary outcome confirmed by clinical user on 2026-07-14",
       "Clinical user supplied and authorized the Chinese VISA-P questionnaire for direct in-app use on 2026-07-14",
       "Patient information screenshot import will use in-process local OCR with review-before-apply and no image retention",
-      "Cloud voice is authorized for direct web use by the clinical user on 2026-07-14, limited to therapist push-to-talk ROM dictation; no continuous recording, patient interview recording, or application audio retention"
+      "Voice entry was removed from the active workflow at the clinical user's request on 2026-07-15",
+      "Knee-to-wall is stored as a distance in cm, consistent with standard clinical performance of that test",
+      "Patient return-to-sport display uses a 24-week literature communication reference, not a validated individual-risk model"
     ],
     "assumptions_pending_clinical_signoff": [
       "Target population: adults or near-adults with clinician-diagnosed or strongly suspected patellar tendinopathy",
@@ -56,9 +55,6 @@
       "synthetic_end_to_end_storage_tested",
       "desktop_and_mobile_ui_checked",
       "secret_configuration_checked",
-      "cloud_voice_boundary_confirmed",
-      "cloud_voice_component_rendered",
-      "cloud_voice_structured_parser_tested",
       "private_github_repository_published",
       "persistent_ssh_push_path_verified",
       "public_streamlit_prototype_deployed",
@@ -74,7 +70,11 @@
       "synthetic_feishu_repeat_stable_id_upsert_verified",
       "all_21_automated_tests_passed_after_deployment",
       "voice_transcript_review_visibility_and_reparse_fixed",
-      "all_22_automated_tests_passed_after_voice_fix"
+      "all_22_automated_tests_passed_after_voice_fix",
+      "voice_entry_removed_from_active_user_interface",
+      "ROM_slider_and_VAS_followup_redesign_implemented",
+      "OCR_runtime_dependency_repaired",
+      "all_26_automated_tests_passed_after_followup_redesign"
     ],
     "next_automatic_action": "When converting this test prototype to clinic use, make the repository and deployment private, restrict app access, define retention and access roles, review patient-data hosting agreements, and rotate production secrets before entering real patient data."
   }

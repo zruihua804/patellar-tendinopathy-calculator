@@ -28,7 +28,7 @@ class PatientScreenshotData:
 
 MEDICAL_RECORD_PATTERNS = (
     re.compile(r"\bN[O0]\s*[.:：#]?[\s]*([A-Za-z0-9-]{4,})", re.IGNORECASE),
-    re.compile(r"(?:病历号|门诊号|住院号)\s*[：:#]?\s*([A-Za-z0-9-]{4,})", re.IGNORECASE),
+    re.compile(r"(?:病历号|门诊号|住院号|就诊号|病例号|MRN)\s*[：:#]?\s*([A-Za-z0-9-]{3,})", re.IGNORECASE),
 )
 AGE_PATTERN = re.compile(r"(\d{1,3})\s*岁")
 DATE_PATTERN = re.compile(
@@ -36,6 +36,9 @@ DATE_PATTERN = re.compile(
     r"(?P<month>\d{1,2})\s*(?:[-/.]|月)\s*(?P<day>\d{1,2})(?:日)?"
 )
 CHINESE_NAME_PATTERN = re.compile(r"[\u4e00-\u9fff·]{2,8}")
+NAME_LABEL_PATTERN = re.compile(r"(?:患者)?姓名\s*[：:#]?\s*([\u4e00-\u9fff·]{2,8})")
+PATIENT_LABEL_PATTERN = re.compile(r"(?:患者|名字)\s*[：:#]?\s*([\u4e00-\u9fff·]{2,8})")
+SEX_LABEL_PATTERN = re.compile(r"(?:性别)\s*[：:#]?\s*([男女])")
 
 
 @lru_cache(maxsize=1)
@@ -72,18 +75,25 @@ def parse_patient_texts(texts: list[str] | tuple[str, ...]) -> PatientScreenshot
             birth_date = None
 
     sex = "待确认"
-    if any("女" in text and "男性" not in text for text in cleaned):
+    sex_match = SEX_LABEL_PATTERN.search(joined)
+    if sex_match:
+        sex = sex_match.group(1)
+    elif any("女" in text and "男性" not in text for text in cleaned):
         sex = "女"
     elif any("男" in text for text in cleaned):
         sex = "男"
 
     name = ""
+    labelled_name = NAME_LABEL_PATTERN.search(joined) or PATIENT_LABEL_PATTERN.search(joined)
+    if labelled_name:
+        name = labelled_name.group(1)
     excluded = {"患者信息", "门诊病历", "女性", "男性", "病历号", "门诊号", "住院号"}
-    for text in cleaned:
-        compact = re.sub(r"\s+", "", text)
-        if CHINESE_NAME_PATTERN.fullmatch(compact) and compact not in excluded:
-            name = compact
-            break
+    if not name:
+        for text in cleaned:
+            compact = re.sub(r"\s+", "", text)
+            if CHINESE_NAME_PATTERN.fullmatch(compact) and compact not in excluded:
+                name = compact
+                break
 
     return PatientScreenshotData(name, record_no, sex, age, birth_date, cleaned)
 
@@ -92,4 +102,7 @@ def extract_patient_screenshot_data(image_bytes: bytes) -> PatientScreenshotData
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
     result = _ocr_engine()(np.asarray(image))
     texts = tuple(getattr(result, "txts", ()) or ())
+    if not texts and isinstance(result, (tuple, list)):
+        candidates = result[0] if result and isinstance(result[0], (tuple, list)) else result
+        texts = tuple(str(item[1]) for item in candidates if isinstance(item, (tuple, list)) and len(item) > 1 and isinstance(item[1], str))
     return parse_patient_texts(texts)

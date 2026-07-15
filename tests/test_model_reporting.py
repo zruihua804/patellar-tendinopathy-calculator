@@ -1,6 +1,6 @@
 import unittest
 
-from model import trend_summary
+from model import return_to_sport_reference, trend_summary
 from reporting import medical_record_text, patient_report
 
 
@@ -17,6 +17,26 @@ class ModelAndReportingTests(unittest.TestCase):
         self.assertIn("伸展受限 5°", report)
         self.assertIn("量角器", report)
         self.assertIn("不替代", patient_report(assessment, trend_summary(50, 55, 5, 4)))
+
+    def test_return_to_sport_reference_uses_stable_literature_anchors(self):
+        reference = return_to_sport_reference(
+            visa_p_total=None,
+            activity_pain_vas=None,
+            symptom_duration_weeks=12,
+            adherence_percent=50,
+        )
+        self.assertEqual(reference.regular_rehab_percent, 43)
+        self.assertEqual(reference.incomplete_rehab_percent, 27)
+
+    def test_return_to_sport_reference_changes_modestly_for_current_state(self):
+        reference = return_to_sport_reference(
+            visa_p_total=85,
+            activity_pain_vas=2,
+            symptom_duration_weeks=12,
+            adherence_percent=80,
+        )
+        self.assertEqual(reference.regular_rehab_percent, 57)
+        self.assertEqual(reference.incomplete_rehab_percent, 41)
 
 
 if __name__ == "__main__":
