@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-MODEL_VERSION = "PT-v0.2-followup-visual-2026-07-15"
+MODEL_VERSION = "PT-v0.3-wide-rom-followup-2026-07-15"
 
 
 @dataclass(frozen=True)
@@ -23,13 +23,25 @@ class ReturnToSportReference:
 
 
 def trend_summary(
-    baseline_visa_p: int | None,
-    current_visa_p: int | None,
-    baseline_pain: float | None,
-    current_pain: float | None,
+    baseline_visa_p: int | float | str | None,
+    current_visa_p: int | float | str | None,
+    baseline_pain: float | int | str | None,
+    current_pain: float | int | str | None,
 ) -> TrendSummary:
-    visa_delta = None if baseline_visa_p is None or current_visa_p is None else current_visa_p - baseline_visa_p
-    pain_delta = None if baseline_pain is None or current_pain is None else baseline_pain - current_pain
+    def as_number(value: object) -> float | None:
+        if value in (None, ""):
+            return None
+        try:
+            return float(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    baseline_visa = as_number(baseline_visa_p)
+    current_visa = as_number(current_visa_p)
+    baseline_vas = as_number(baseline_pain)
+    current_vas = as_number(current_pain)
+    visa_delta = None if baseline_visa is None or current_visa is None else int(round(current_visa - baseline_visa))
+    pain_delta = None if baseline_vas is None or current_vas is None else baseline_vas - current_vas
     if visa_delta is None:
         interpretation = "VISA-P 尚未同时在基线和当前时间点完成，不能计算功能变化。"
     elif visa_delta >= 13:

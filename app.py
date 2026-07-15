@@ -374,22 +374,55 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
     trend = trend_summary(baseline_visa, score, baseline_pain, pain_vas)
     assessor = st.session_state.therapist or st.session_state.doctor
     reference_side = reference_knee_side()
-    rom_rows = [
-        {"rom_id": stable_id("PT-ROM", identity.assessment_id, "knee", "affected"), "assessment_id": identity.assessment_id, "joint": "膝关节", "side": st.session_state.affected_side, "comparison_role": "患侧", "mode": "主动", "flexion_deg": st.session_state.affected_knee_flexion_deg, "extension_deficit_deg": st.session_state.affected_knee_extension_deficit_deg, "method": st.session_state.rom_method, "assessor": assessor, "measured_at": identity.assessment_date},
-        {"rom_id": stable_id("PT-ROM", identity.assessment_id, "knee", "reference"), "assessment_id": identity.assessment_id, "joint": "膝关节", "side": reference_side, "comparison_role": "健侧/对照侧", "mode": "主动", "flexion_deg": st.session_state.reference_knee_flexion_deg, "extension_deficit_deg": st.session_state.reference_knee_extension_deficit_deg, "method": st.session_state.rom_method, "assessor": assessor, "measured_at": identity.assessment_date},
-        {"rom_id": stable_id("PT-ROM", identity.assessment_id, "hip", "affected"), "assessment_id": identity.assessment_id, "joint": "髋关节", "side": st.session_state.affected_side, "comparison_role": "患侧同侧", "mode": "主动", "flexion_deg": st.session_state.affected_hip_flexion_deg, "extension_deg": st.session_state.affected_hip_extension_deg, "internal_rotation_deg": st.session_state.affected_hip_internal_rotation_deg, "external_rotation_deg": st.session_state.affected_hip_external_rotation_deg, "method": st.session_state.rom_method, "assessor": assessor, "measured_at": identity.assessment_date},
-        {"rom_id": stable_id("PT-ROM", identity.assessment_id, "ankle", "affected"), "assessment_id": identity.assessment_id, "joint": "踝关节", "side": st.session_state.affected_side, "comparison_role": "患侧同侧", "mode": "主动", "knee_to_wall_cm": st.session_state.affected_ankle_knee_to_wall_cm, "method": st.session_state.rom_method, "assessor": assessor, "measured_at": identity.assessment_date},
-    ]
+    # One wide ROM row per assessment. This keeps the clinical Base readable
+    # while retaining all left/right knee, hip, and ankle values as columns.
+    rom = {
+        "rom_id": stable_id("PT-ROM", identity.assessment_id),
+        "assessment_id": identity.assessment_id,
+        "patient_id": patient_id,
+        "episode_id": identity.episode_id,
+        "affected_side": st.session_state.affected_side,
+        "reference_knee_side": reference_side,
+        "mode": "主动",
+        "affected_knee_flexion_deg": st.session_state.affected_knee_flexion_deg,
+        "affected_knee_extension_deficit_deg": st.session_state.affected_knee_extension_deficit_deg,
+        "reference_knee_flexion_deg": st.session_state.reference_knee_flexion_deg,
+        "reference_knee_extension_deficit_deg": st.session_state.reference_knee_extension_deficit_deg,
+        "affected_hip_flexion_deg": st.session_state.affected_hip_flexion_deg,
+        "affected_hip_extension_deg": st.session_state.affected_hip_extension_deg,
+        "affected_hip_internal_rotation_deg": st.session_state.affected_hip_internal_rotation_deg,
+        "affected_hip_external_rotation_deg": st.session_state.affected_hip_external_rotation_deg,
+        "affected_ankle_knee_to_wall_cm": st.session_state.affected_ankle_knee_to_wall_cm,
+        "method": st.session_state.rom_method,
+        "assessor": assessor,
+        "measured_at": identity.assessment_date,
+    }
     rehab = {"rehab_id": stable_id("PT-R", identity.episode_id, st.session_state.rehab_week_no), "episode_id": identity.episode_id, "week_no": st.session_state.rehab_week_no, "phase": st.session_state.rehab_phase, "supervised_sessions": st.session_state.supervised_sessions, "home_training_days": st.session_state.home_training_days, "adherence_percent": st.session_state.adherence_percent, "pain_during_load_nrs": st.session_state.pain_during_load_nrs, "pain_24h_after_nrs": st.session_state.pain_24h_after_nrs, "therapist_interpretation": st.session_state.therapist_interpretation}
-    outcome = {"outcome_id": stable_id("PT-O", identity.episode_id, identity.timepoint), "episode_id": identity.episode_id, "timepoint": identity.timepoint, "visa_p_total": score, "visa_p_change_from_baseline": trend.visa_p_delta, "activity_pain_nrs": pain_vas, "activity_pain_vas": pain_vas, "return_to_activity_status": st.session_state.return_to_activity_status, "escalation_or_surgery": st.session_state.escalation_or_surgery, "escalation_reason": st.session_state.escalation_reason}
-    report = {"report_id": stable_id("PT-REP", identity.assessment_id, MODEL_VERSION), "assessment_id": identity.assessment_id, "evidence_version": MODEL_VERSION, "model_status": "数据采集与趋势计算", "patient_report_text": patient_report(assessment, trend), "medical_record_text": medical_record_text(assessment, rom_rows, trend)}
+    baseline_row = next((row for row in merged_history if row.get("timepoint") == "基线"), None)
+    followup_summary = {
+        "episode_id": identity.episode_id,
+        "patient_id": patient_id,
+        "baseline_date": baseline_row.get("assessment_date") if baseline_row else None,
+        "baseline_visa_p_total": baseline_visa,
+        "baseline_activity_pain_vas": baseline_pain,
+        "latest_date": identity.assessment_date,
+        "latest_timepoint": identity.timepoint,
+        "latest_visa_p_total": score,
+        "latest_activity_pain_vas": pain_vas,
+        "visa_p_change_from_baseline": trend.visa_p_delta,
+        "pain_change_from_baseline": trend.pain_delta,
+        "return_to_activity_status": st.session_state.return_to_activity_status,
+        "escalation_or_surgery": st.session_state.escalation_or_surgery,
+        "escalation_reason": st.session_state.escalation_reason,
+    }
+    report = {"report_id": stable_id("PT-REP", identity.assessment_id, MODEL_VERSION), "assessment_id": identity.assessment_id, "evidence_version": MODEL_VERSION, "model_status": "数据采集与趋势计算", "patient_report_text": patient_report(assessment, trend), "medical_record_text": medical_record_text(assessment, rom, trend)}
     records: dict[str, object] = {
         "patients": {"patient_id": patient_id, "medical_record_no": st.session_state.medical_record_no, "name": st.session_state.patient_name, "sex": st.session_state.sex, "birth_date": st.session_state.birth_date, "consent_status": st.session_state.consent_status},
         "episodes": {"episode_id": identity.episode_id, "patient_id": patient_id, "affected_side": st.session_state.affected_side, "status": st.session_state.episode_status, "symptom_duration_weeks": st.session_state.symptom_duration_weeks, "diagnostic_confidence": st.session_state.diagnostic_confidence, "red_flag_present": st.session_state.red_flag_present, "doctor": st.session_state.doctor, "therapist": st.session_state.therapist},
         "assessments": assessment,
-        "rom": rom_rows,
+        "rom": rom,
         "rehab": rehab,
-        "outcomes": outcome,
+        "followup_summary": followup_summary,
         "reports": report,
     }
     return records, warnings, trend
@@ -413,6 +446,25 @@ def render_followup_charts(history: list[dict[str, object]]) -> None:
         st.caption("指定负荷疼痛 VAS：越低越好")
         st.line_chart(frame.set_index("评估日期")[["activity_pain_vas"]], height=230)
     st.dataframe(frame[["timepoint", "assessment_date", "visa_p_total", "activity_pain_vas", "return_to_activity_status"]], hide_index=True, use_container_width=True)
+
+
+def render_return_to_sport_bars(regular_percent: int, incomplete_percent: int) -> None:
+    st.markdown("#### 重返原先运动水平")
+    st.caption("以每 100 名相似患者为单位的 24 周沟通参考")
+    for label, percent, color in (
+        ("规律完成结构化康复", regular_percent, "#0f766e"),
+        ("未规律完成结构化康复", incomplete_percent, "#9ca3af"),
+    ):
+        title, value = st.columns([4, 1])
+        with title:
+            st.markdown(f"**{label}**")
+        with value:
+            st.markdown(f"**{percent}%**")
+        st.markdown(
+            f'<div style="width:100%; background:#e5e7eb; border-radius:999px; height:22px; overflow:hidden; margin:-6px 0 18px;">'
+            f'<div style="width:{percent}%; min-width:34px; height:22px; background:{color}; border-radius:999px;"></div></div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_report_and_save() -> None:
@@ -445,6 +497,9 @@ def render_report_and_save() -> None:
     for warning in warnings:
         st.warning(warning)
     st.caption(f"趋势来源：{history_source}；当前未保存的评估以预览形式显示。")
+    config = configured_feishu()
+    if config and config.bitable_url.startswith(("https://", "http://")):
+        st.link_button("打开飞书随访数据库", config.bitable_url, use_container_width=False)
     render_followup_charts(visual_history)
 
     scenario = evidence_scenario_summary()
@@ -454,15 +509,8 @@ def render_report_and_save() -> None:
         symptom_duration_weeks=current["symptom_duration_weeks"],
         adherence_percent=st.session_state.adherence_percent,
     )
-    st.markdown("#### 重返原先运动水平")
     st.caption(f"目标：{st.session_state.target_sport or '尚未填写'} · {st.session_state.target_activity_level} · 24 周文献沟通参考")
-    reference_frame = pd.DataFrame(
-        {
-            "康复路径": ["规律完成结构化康复", "未规律完成结构化康复"],
-            "重返原先运动水平参考（%）": [reference.regular_rehab_percent, reference.incomplete_rehab_percent],
-        }
-    ).set_index("康复路径")
-    st.bar_chart(reference_frame, height=250)
+    render_return_to_sport_bars(reference.regular_rehab_percent, reference.incomplete_rehab_percent)
     if reference.drivers:
         st.caption("本次参考已结合：" + "、".join(reference.drivers) + "。")
     with st.expander("查看研究依据", expanded=False):
@@ -489,7 +537,6 @@ def render_report_and_save() -> None:
         except (ValueError, DuplicateRecordError) as exc:
             st.error(str(exc))
 
-    config = configured_feishu()
     if not config:
         return
     if st.button("保存并同步到飞书多维表格"):
@@ -509,6 +556,9 @@ def render_sidebar() -> None:
     with st.sidebar:
         st.header("髌腱病临床计算器")
         st.caption("评估、ROM、康复进度与自动随访；不输出手术概率。")
+        config = configured_feishu()
+        if config and config.bitable_url.startswith(("https://", "http://")):
+            st.link_button("打开飞书数据库", config.bitable_url, use_container_width=True)
         st.divider()
         st.write(f"模型版本：{MODEL_VERSION}")
         with st.expander("证据与限制"):

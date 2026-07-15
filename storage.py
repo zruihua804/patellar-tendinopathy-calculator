@@ -15,7 +15,7 @@ TABLE_FILES = {
     "assessments": "assessments.csv",
     "rom": "rom.csv",
     "rehab": "rehab.csv",
-    "outcomes": "outcomes.csv",
+    "followup_summary": "followup_summary.csv",
     "reports": "reports.csv",
 }
 PRIMARY_KEY_BY_TABLE = {
@@ -24,7 +24,7 @@ PRIMARY_KEY_BY_TABLE = {
     "assessments": "assessment_id",
     "rom": "rom_id",
     "rehab": "rehab_id",
-    "outcomes": "outcome_id",
+    "followup_summary": "episode_id",
     "reports": "report_id",
 }
 

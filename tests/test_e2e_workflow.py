@@ -58,10 +58,11 @@ class SyntheticWorkflowTests(unittest.TestCase):
                     "visa_p_completion_status": "completed",
                 },
                 "rom": {
-                    "rom_id": stable_id("PT-ROM", identity.assessment_id, "膝关节", "左", "主动"),
+                    "rom_id": stable_id("PT-ROM", identity.assessment_id),
                     "assessment_id": identity.assessment_id,
-                    "flexion_deg": 135,
-                    "extension_deficit_deg": 0,
+                    "patient_id": patient_id,
+                    "affected_knee_flexion_deg": 135,
+                    "reference_knee_flexion_deg": 135,
                 },
                 "rehab": {
                     "rehab_id": stable_id("PT-R", identity.episode_id, 1),
@@ -69,11 +70,11 @@ class SyntheticWorkflowTests(unittest.TestCase):
                     "week_no": 1,
                     "phase": "症状管理",
                 },
-                "outcomes": {
-                    "outcome_id": stable_id("PT-O", identity.episode_id, "基线"),
+                "followup_summary": {
                     "episode_id": identity.episode_id,
-                    "timepoint": "基线",
-                    "visa_p_total": score,
+                    "patient_id": patient_id,
+                    "latest_timepoint": "基线",
+                    "latest_visa_p_total": score,
                 },
                 "reports": {
                     "report_id": stable_id("PT-REP", identity.assessment_id, "PT-v0.1-trend-only-2026-07-14"),

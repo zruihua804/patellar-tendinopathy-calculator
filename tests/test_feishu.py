@@ -16,22 +16,25 @@ class FeishuAdapterTests(unittest.TestCase):
         self.assertEqual(fields["VISA-P总分"], 55.0)
         self.assertIsInstance(fields["评估日期"], int)
 
-    def test_formats_new_rom_and_vas_fields(self):
+    def test_formats_wide_rom_fields(self):
         fields = format_record_fields(
             "rom",
             {
                 "rom_id": "PT-ROM-1",
                 "assessment_id": "PT-A-1",
-                "joint": "髋关节",
-                "comparison_role": "患侧同侧",
-                "internal_rotation_deg": 35,
-                "external_rotation_deg": 45,
-                "knee_to_wall_cm": 10,
+                "patient_id": "PT-P-1",
+                "affected_side": "左",
+                "affected_knee_flexion_deg": 135,
+                "reference_knee_flexion_deg": 140,
+                "affected_hip_internal_rotation_deg": 35,
+                "affected_ankle_knee_to_wall_cm": 10,
             },
         )
-        self.assertEqual(fields["关节"], "髋关节")
-        self.assertEqual(fields["内旋（度）"], 35.0)
-        self.assertEqual(fields["膝靠墙距离（cm）"], 10.0)
+        self.assertEqual(fields["患侧"], "左")
+        self.assertEqual(fields["患侧膝屈曲（度）"], 135.0)
+        self.assertEqual(fields["健侧膝屈曲（度）"], 140.0)
+        self.assertEqual(fields["患侧髋内旋（度）"], 35.0)
+        self.assertEqual(fields["患侧踝膝靠墙（cm）"], 10.0)
 
 
 if __name__ == "__main__":

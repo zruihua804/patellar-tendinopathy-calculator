@@ -29,6 +29,18 @@ def patient_report(assessment: dict[str, Any], trend: TrendSummary) -> str:
 def medical_record_text(assessment: dict[str, Any], rom_rows: list[dict[str, Any]] | dict[str, Any], trend: TrendSummary) -> str:
     # Retain compatibility with early prototype records that had a single ROM row.
     if isinstance(rom_rows, dict):
+        if "affected_knee_flexion_deg" in rom_rows:
+            wide = rom_rows
+            return (
+                f"髌腱病评估：{_value(assessment, 'affected_side')}侧；症状持续 {_value(assessment, 'symptom_duration_weeks')} 周；"
+                f"指定负荷活动“{_value(assessment, 'pain_activity_description')}”疼痛 VAS {_value(assessment, 'activity_pain_vas', _value(assessment, 'activity_pain_nrs'))}/10。"
+                f"VISA-P {_value(assessment, 'visa_p_total')}/100（状态：{_value(assessment, 'visa_p_completion_status')}）。\n"
+                f"ROM：患侧膝屈曲 {_value(wide, 'affected_knee_flexion_deg', '未测')}°、伸展受限 {_value(wide, 'affected_knee_extension_deficit_deg', '未测')}°；"
+                f"{_value(wide, 'reference_knee_side')}侧膝屈曲 {_value(wide, 'reference_knee_flexion_deg', '未测')}°、伸展受限 {_value(wide, 'reference_knee_extension_deficit_deg', '未测')}°。"
+                f"患侧髋屈曲 {_value(wide, 'affected_hip_flexion_deg', '未测')}°、伸展 {_value(wide, 'affected_hip_extension_deg', '未测')}°、内旋 {_value(wide, 'affected_hip_internal_rotation_deg', '未测')}°、外旋 {_value(wide, 'affected_hip_external_rotation_deg', '未测')}°；"
+                f"踝膝靠墙 {_value(wide, 'affected_ankle_knee_to_wall_cm', '未测')} cm；测量方法 {_value(wide, 'method')}。\n"
+                f"随访解释：{trend.interpretation}"
+            )
         rom_rows = [{"joint": "膝关节", "comparison_role": "患侧", **rom_rows}]
     knee_affected = next((row for row in rom_rows if row.get("joint") == "膝关节" and row.get("comparison_role") == "患侧"), {})
     knee_reference = next((row for row in rom_rows if row.get("joint") == "膝关节" and row.get("comparison_role") == "健侧/对照侧"), {})
