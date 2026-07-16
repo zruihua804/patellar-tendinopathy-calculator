@@ -11,21 +11,15 @@ import pandas as pd
 
 TABLE_FILES = {
     "patients": "patients.csv",
-    "episodes": "episodes.csv",
     "assessments": "assessments.csv",
     "rom": "rom.csv",
-    "rehab": "rehab.csv",
     "followup_summary": "followup_summary.csv",
-    "reports": "reports.csv",
 }
-PRIMARY_KEY_BY_TABLE = {
-    "patients": "patient_id",
-    "episodes": "episode_id",
-    "assessments": "assessment_id",
-    "rom": "rom_id",
-    "rehab": "rehab_id",
-    "followup_summary": "episode_id",
-    "reports": "report_id",
+UNIQUE_KEYS_BY_TABLE = {
+    "patients": ("patient_id",),
+    "assessments": ("patient_id", "timepoint", "assessment_date"),
+    "rom": ("patient_id", "timepoint", "measured_at"),
+    "followup_summary": ("patient_id",),
 }
 
 
@@ -44,10 +38,10 @@ class LocalStorage:
         return self.data_dir / TABLE_FILES[table]
 
     def upsert_record(self, table: str, record: dict[str, Any]) -> tuple[str, Path]:
-        key = PRIMARY_KEY_BY_TABLE[table]
-        key_value = record.get(key)
-        if key_value in (None, ""):
-            raise ValueError(f"缺少稳定临床 ID：{key}")
+        keys = UNIQUE_KEYS_BY_TABLE[table]
+        missing = [key for key in keys if record.get(key) in (None, "")]
+        if missing:
+            raise ValueError(f"缺少安全更新字段：{'、'.join(missing)}")
         path = self._path(table)
         row = {**record, "saved_at": datetime.now().isoformat(timespec="seconds")}
         if not path.exists():
@@ -58,9 +52,11 @@ class LocalStorage:
         for column in row:
             if column not in frame.columns:
                 frame[column] = ""
-        matches = frame.index[frame[key].astype(str) == str(key_value)].tolist()
+        matches = frame.index[
+            frame.apply(lambda existing: all(str(existing.get(key, "")) == str(row.get(key, "")) for key in keys), axis=1)
+        ].tolist()
         if len(matches) > 1:
-            raise DuplicateRecordError(f"发现 {len(matches)} 条相同 {key} 的历史记录；请人工核查，系统不会自动删除。")
+            raise DuplicateRecordError(f"发现 {len(matches)} 条同一患者与评估时间的历史记录；请人工核查，系统不会自动删除。")
         if not matches:
             pd.concat([frame, pd.DataFrame([row])], ignore_index=True).to_csv(path, index=False)
             return "created", path

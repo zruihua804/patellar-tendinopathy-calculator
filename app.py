@@ -6,8 +6,8 @@ import hmac
 import pandas as pd
 import streamlit as st
 
-from domain import REHAB_PHASES, RETURN_TO_ACTIVITY, TIMEPOINTS, assessment_identity, clinical_warnings, patient_id_from_record, stable_id
-from feishu import FeishuAPIError, FeishuBitableClient, FeishuConfig, FeishuConfigurationError
+from domain import REHAB_PHASES, RETURN_TO_ACTIVITY, TIMEPOINTS, clinical_warnings, patient_id_from_record
+from feishu import RETIRED_TABLE_NAMES, FeishuAPIError, FeishuBitableClient, FeishuConfig, FeishuConfigurationError
 from model import MODEL_VERSION, evidence_scenario_summary, return_to_sport_reference, trend_summary
 from patient_ocr import OCRUnavailableError, extract_patient_screenshot_data
 from questionnaires import (
@@ -26,6 +26,8 @@ from storage import DEFAULT_STORAGE, DuplicateRecordError
 
 
 st.set_page_config(page_title="髌腱病临床计算器", page_icon="🦵", layout="wide")
+
+APP_RELEASE = "PT-v0.4-patient-id-tables-2026-07-16"
 
 
 def init_state() -> None:
@@ -114,6 +116,32 @@ def configured_feishu() -> FeishuConfig | None:
         return None
 
 
+def patient_profile_by_id(patient_id: str) -> tuple[dict[str, object] | None, str]:
+    """Retrieve one patient's basic profile for follow-up without re-entry."""
+    config = configured_feishu()
+    if config:
+        try:
+            client = FeishuBitableClient(config)
+            token = client.resolve_bitable_token()
+            table_id = client.ensure_schema(token)["patients"]
+            for row in client.list_records(token, table_id):
+                fields = dict(row.get("fields", {}))
+                if str(fields.get("患者ID", "")) == patient_id:
+                    return {
+                        "medical_record_no": fields.get("病历号", ""),
+                        "name": fields.get("姓名", ""),
+                        "sex": fields.get("性别", "待确认"),
+                        "birth_date": fields.get("出生日期"),
+                        "consent_status": fields.get("同意状态", "待确认"),
+                    }, "飞书患者主表"
+        except (FeishuConfigurationError, FeishuAPIError, ValueError):
+            pass
+    for row in DEFAULT_STORAGE.list_records("patients"):
+        if str(row.get("patient_id", "")) == patient_id:
+            return row, "本地原型记录"
+    return None, ""
+
+
 def render_patient_screenshot_import() -> None:
     st.subheader("患者资料截图识别")
     st.caption("上传清晰的患者基本信息区域（姓名、病历号、性别、出生日期）。截图只在当前会话内本地解析，不会保存原图；结果必须确认后才会写入。")
@@ -173,6 +201,22 @@ def render_patient_entry() -> None:
     left, right = st.columns(2)
     with left:
         st.text_input("患者 ID（由病历号自动生成；可确认）", key="patient_id")
+        if st.button("查询并带入已有患者资料", disabled=not bool(str(st.session_state.patient_id).strip())):
+            profile, source = patient_profile_by_id(str(st.session_state.patient_id).strip())
+            if not profile:
+                st.warning("未找到该患者 ID。请核对后重试，或按首次患者完成基础资料录入。")
+            else:
+                st.session_state.medical_record_no = str(profile.get("medical_record_no", ""))
+                st.session_state.patient_name = str(profile.get("name", ""))
+                st.session_state.sex = str(profile.get("sex", "待确认"))
+                if profile.get("birth_date"):
+                    birth = profile["birth_date"]
+                    st.session_state.birth_date = pd.to_datetime(birth, unit="ms" if isinstance(birth, (int, float)) else None).date()
+                st.session_state.consent_status = str(profile.get("consent_status", "待确认"))
+                st.session_state.patient_profile_notice = f"已从{source}带入患者基础资料；本次随访无需重复录入。"
+                st.rerun()
+        if notice := st.session_state.pop("patient_profile_notice", ""):
+            st.success(notice)
         st.text_input("病历号", key="medical_record_no")
         st.text_input("姓名", key="patient_name")
         st.selectbox("性别", ["男", "女", "待确认"], key="sex")
@@ -307,7 +351,7 @@ def normalise_history_row(row: dict[str, object]) -> dict[str, object]:
         return next((value for value in values if value not in (None, "")), "")
 
     return {
-        "assessment_id": first_present(row.get("assessment_id"), row.get("评估ID")),
+        "patient_id": first_present(row.get("patient_id"), row.get("患者ID")),
         "timepoint": first_present(row.get("timepoint"), row.get("评估节点")),
         "assessment_date": first_present(row.get("assessment_date"), row.get("评估日期")),
         "visa_p_total": first_present(row.get("visa_p_total"), row.get("VISA-P总分")),
@@ -317,8 +361,17 @@ def normalise_history_row(row: dict[str, object]) -> dict[str, object]:
 
 
 def with_current_assessment(history: list[dict[str, object]], current: dict[str, object]) -> list[dict[str, object]]:
-    current_id = str(current["assessment_id"])
-    merged = [normalise_history_row(row) for row in history if str(normalise_history_row(row)["assessment_id"]) != current_id]
+    def natural_key(row: dict[str, object]) -> tuple[str, str, str]:
+        parsed_date = _date_sort_value(row["assessment_date"])
+        date_key = parsed_date.date().isoformat() if not pd.isna(parsed_date) else str(row["assessment_date"])
+        return str(row["patient_id"]), str(row["timepoint"]), date_key
+
+    current_key = natural_key(normalise_history_row(current))
+    merged = [
+        normalise_history_row(row)
+        for row in history
+        if natural_key(normalise_history_row(row)) != current_key
+    ]
     merged.append(normalise_history_row(current))
     return sorted(merged, key=lambda row: _date_sort_value(row["assessment_date"]))
 
@@ -345,15 +398,12 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
     score = st.session_state.get("current_visa_p_total")
     status = visa_p_completion_status(st.session_state.get("current_visa_answers", {}))
     patient_id = st.session_state.patient_id or patient_id_from_record(st.session_state.medical_record_no, st.session_state.patient_name)
-    identity = assessment_identity(patient_id, st.session_state.affected_side, st.session_state.timepoint, st.session_state.assessment_date)
     pain_vas = float(st.session_state.activity_pain_vas)
     warnings = clinical_warnings(red_flag_present=bool(st.session_state.red_flag_present), diagnostic_confidence=str(st.session_state.diagnostic_confidence), visa_p_total=score, activity_pain_nrs=pain_vas)
     assessment = {
-        "assessment_id": identity.assessment_id,
         "patient_id": patient_id,
-        "episode_id": identity.episode_id,
-        "timepoint": identity.timepoint,
-        "assessment_date": identity.assessment_date,
+        "timepoint": st.session_state.timepoint,
+        "assessment_date": st.session_state.assessment_date,
         "affected_side": st.session_state.affected_side,
         "symptom_duration_weeks": st.session_state.symptom_duration_weeks,
         "activity_pain_nrs": pain_vas,
@@ -365,8 +415,19 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
         "target_sport": st.session_state.target_sport,
         "target_activity_level": st.session_state.target_activity_level,
         "return_to_activity_status": st.session_state.return_to_activity_status,
-        "imaging_summary": st.session_state.imaging_summary,
-        "clinical_notes": st.session_state.clinical_notes,
+        "episode_status": st.session_state.episode_status,
+        "primary_activity": st.session_state.primary_activity,
+        "recent_load_change": st.session_state.recent_load_change,
+        "doctor": st.session_state.doctor,
+        "therapist": st.session_state.therapist,
+        "week_no": st.session_state.rehab_week_no,
+        "phase": st.session_state.rehab_phase,
+        "supervised_sessions": st.session_state.supervised_sessions,
+        "home_training_days": st.session_state.home_training_days,
+        "adherence_percent": st.session_state.adherence_percent,
+        "pain_during_load_nrs": st.session_state.pain_during_load_nrs,
+        "pain_24h_after_nrs": st.session_state.pain_24h_after_nrs,
+        "therapist_interpretation": st.session_state.therapist_interpretation,
         "warnings": "；".join(warnings),
     }
     merged_history = with_current_assessment(history, assessment)
@@ -377,10 +438,8 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
     # One wide ROM row per assessment. This keeps the clinical Base readable
     # while retaining all left/right knee, hip, and ankle values as columns.
     rom = {
-        "rom_id": stable_id("PT-ROM", identity.assessment_id),
-        "assessment_id": identity.assessment_id,
         "patient_id": patient_id,
-        "episode_id": identity.episode_id,
+        "timepoint": st.session_state.timepoint,
         "affected_side": st.session_state.affected_side,
         "reference_knee_side": reference_side,
         "mode": "主动",
@@ -395,18 +454,16 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
         "affected_ankle_knee_to_wall_cm": st.session_state.affected_ankle_knee_to_wall_cm,
         "method": st.session_state.rom_method,
         "assessor": assessor,
-        "measured_at": identity.assessment_date,
+        "measured_at": st.session_state.assessment_date,
     }
-    rehab = {"rehab_id": stable_id("PT-R", identity.episode_id, st.session_state.rehab_week_no), "episode_id": identity.episode_id, "week_no": st.session_state.rehab_week_no, "phase": st.session_state.rehab_phase, "supervised_sessions": st.session_state.supervised_sessions, "home_training_days": st.session_state.home_training_days, "adherence_percent": st.session_state.adherence_percent, "pain_during_load_nrs": st.session_state.pain_during_load_nrs, "pain_24h_after_nrs": st.session_state.pain_24h_after_nrs, "therapist_interpretation": st.session_state.therapist_interpretation}
     baseline_row = next((row for row in merged_history if row.get("timepoint") == "基线"), None)
     followup_summary = {
-        "episode_id": identity.episode_id,
         "patient_id": patient_id,
         "baseline_date": baseline_row.get("assessment_date") if baseline_row else None,
         "baseline_visa_p_total": baseline_visa,
         "baseline_activity_pain_vas": baseline_pain,
-        "latest_date": identity.assessment_date,
-        "latest_timepoint": identity.timepoint,
+        "latest_date": st.session_state.assessment_date,
+        "latest_timepoint": st.session_state.timepoint,
         "latest_visa_p_total": score,
         "latest_activity_pain_vas": pain_vas,
         "visa_p_change_from_baseline": trend.visa_p_delta,
@@ -415,15 +472,11 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
         "escalation_or_surgery": st.session_state.escalation_or_surgery,
         "escalation_reason": st.session_state.escalation_reason,
     }
-    report = {"report_id": stable_id("PT-REP", identity.assessment_id, MODEL_VERSION), "assessment_id": identity.assessment_id, "evidence_version": MODEL_VERSION, "model_status": "数据采集与趋势计算", "patient_report_text": patient_report(assessment, trend), "medical_record_text": medical_record_text(assessment, rom, trend)}
     records: dict[str, object] = {
         "patients": {"patient_id": patient_id, "medical_record_no": st.session_state.medical_record_no, "name": st.session_state.patient_name, "sex": st.session_state.sex, "birth_date": st.session_state.birth_date, "consent_status": st.session_state.consent_status},
-        "episodes": {"episode_id": identity.episode_id, "patient_id": patient_id, "affected_side": st.session_state.affected_side, "status": st.session_state.episode_status, "symptom_duration_weeks": st.session_state.symptom_duration_weeks, "diagnostic_confidence": st.session_state.diagnostic_confidence, "red_flag_present": st.session_state.red_flag_present, "doctor": st.session_state.doctor, "therapist": st.session_state.therapist},
         "assessments": assessment,
         "rom": rom,
-        "rehab": rehab,
         "followup_summary": followup_summary,
-        "reports": report,
     }
     return records, warnings, trend
 
@@ -517,13 +570,13 @@ def render_report_and_save() -> None:
         st.caption(str(scenario["difference"]))
         st.caption(str(scenario["source"]))
 
-    report = dict(records["reports"])
+    report = {
+        "patient_report_text": patient_report(current, trend),
+        "medical_record_text": medical_record_text(current, dict(records["rom"]), trend),
+    }
     with st.expander("供临床人员复制的简明文字", expanded=False):
-        patient_text = st.text_area("患者简明文字", value=str(report["patient_report_text"]), height=150, key=f"patient_report_{report['report_id']}")
-        record_text = st.text_area("病历文本", value=str(report["medical_record_text"]), height=210, key=f"medical_record_{report['report_id']}")
-        report["patient_report_text"] = patient_text
-        report["medical_record_text"] = record_text
-        records["reports"] = report
+        st.text_area("患者简明文字", value=str(report["patient_report_text"]), height=150, key="patient_report_preview")
+        st.text_area("病历文本", value=str(report["medical_record_text"]), height=210, key="medical_record_preview")
 
     st.divider()
     if st.button("保存到本地临床记录", type="primary"):
@@ -559,8 +612,25 @@ def render_sidebar() -> None:
         config = configured_feishu()
         if config and config.bitable_url.startswith(("https://", "http://")):
             st.link_button("打开飞书数据库", config.bitable_url, use_container_width=True)
+        if config:
+            with st.expander("管理员：清理旧表", expanded=False):
+                st.caption("保留：患者主表、髌腱病评估表、ROM 综合评估、患者随访总览。")
+                st.caption("删除旧表：" + "、".join(RETIRED_TABLE_NAMES) + "；并移除保留表内旧的评估/病程/ROM ID 列。此操作不可恢复。")
+                confirmed = st.checkbox("我确认执行旧表与旧 ID 列清理", key="confirm_retired_table_cleanup")
+                if st.button("清理旧表与旧 ID 列", disabled=not confirmed, key="delete_retired_feishu_tables", type="secondary"):
+                    try:
+                        client = FeishuBitableClient(config)
+                        token = client.resolve_bitable_token()
+                        client.ensure_schema(token)
+                        removed = client.delete_retired_tables(token)
+                        removed_fields = client.delete_retired_id_fields(token)
+                        summary = removed + removed_fields
+                        st.success("已清理：" + ("、".join(summary) if summary else "未发现需要清理的旧表或旧 ID 列") + "。")
+                    except (FeishuConfigurationError, FeishuAPIError, ValueError) as exc:
+                        st.error(f"旧表清理失败：{exc}")
         st.divider()
-        st.write(f"模型版本：{MODEL_VERSION}")
+        st.write(f"工具版本：{APP_RELEASE}")
+        st.caption(f"循证模型版本：{MODEL_VERSION}")
         with st.expander("证据与限制"):
             st.markdown("- [髌腱病临床管理综述](https://pmc.ncbi.nlm.nih.gov/articles/PMC9528703/)")
             st.markdown("- [渐进肌腱负荷随机试验](https://pubmed.ncbi.nlm.nih.gov/33219115/)")

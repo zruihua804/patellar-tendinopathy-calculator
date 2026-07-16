@@ -1,77 +1,37 @@
 table,field,type,required,source,purpose
-patients,patient_id,text,yes,system,稳定患者身份；生产环境限制访问
+patients,patient_id,text,yes,system,唯一对外患者身份；用于所有随访检索
 patients,medical_record_no,text,yes,doctor/OCR,病历检索；直接标识信息
 patients,name,text,yes,doctor/OCR,直接标识信息；生产环境限制访问
 patients,sex,select,no,doctor/OCR,人口学背景
-patients,birth_date,date,no,doctor/OCR,系统计算评估时年龄
+patients,birth_date,date,no,doctor/OCR,出生日期
 patients,consent_status,select,yes,doctor,数据使用同意状态
-episodes,episode_id,text,yes,system,稳定疾病事件身份
-episodes,patient_id,text,yes,system,关联患者
-episodes,condition,select,yes,system,髌腱病
-episodes,affected_side,select,yes,doctor,左/右/双侧；双侧应分别评估主诉侧
-episodes,onset_date,date,no,doctor,起病日期或估计日期
-episodes,symptom_duration_weeks,number,yes,doctor,症状时长
-episodes,status,select,yes,doctor,新诊断/保守康复中/复评/已结束
-episodes,diagnostic_confidence,select,yes,doctor,确诊/高度怀疑/待鉴别
-episodes,red_flag_present,boolean,yes,doctor,疑似断裂或其他需优先复评状况
-assessments,assessment_id,text,yes,system,疾病事件+时间点的稳定身份
-assessments,episode_id,text,yes,system,关联疾病事件
+assessments,patient_id,text,yes,system/user,唯一可见关联字段
 assessments,timepoint,select,yes,doctor/therapist,基线/6周/12周/6个月/12个月
-assessments,assessment_date,date,yes,system/user,实际评估日期
-assessments,source_role,select,yes,user,doctor/therapist/patient
-assessments,activity_pain_nrs,number,yes,patient/clinician,指定负荷活动疼痛 0–10
-assessments,pain_activity_description,text,yes,doctor/therapist,疼痛对应的负荷活动
+assessments,assessment_date,date,yes,system/user,实际评估日期；与患者ID和节点共同用于后台更新
+assessments,affected_side,select,yes,doctor,左/右/双侧
+assessments,episode_status,select,yes,doctor,新诊断/保守康复中/复评/已结束
+assessments,symptom_duration_weeks,number,yes,doctor,症状时长
+assessments,diagnostic_confidence,select,yes,doctor,确诊/高度怀疑/待鉴别
+assessments,red_flag_present,boolean,yes,doctor,疑似断裂或其他需优先复评状况
 assessments,visa_p_total,number,no,authorized questionnaire,0–100；仅在完成时保存总分
-assessments,visa_p_completion_status,select,yes,user,completed/not completed
-assessments,visa_p_respondent_source,select,yes,user,patient/doctor-assisted/therapist-assisted/not completed
-assessments,return_to_activity_status,select,yes,patient/clinician,未恢复/恢复部分活动/恢复目标运动但未达伤前水平/恢复伤前水平
-assessments,imaging_summary,text,no,doctor,可选；不作为自动诊断依据
-assessments,clinical_notes,text,no,doctor,简短临床解释
-rom,rom_id,text,yes,system,每个评估一条 ROM 综合记录的稳定身份
-rom,assessment_id,text,yes,system,关联评估
-rom,patient_id,text,yes,system,关联患者
-rom,episode_id,text,yes,system,关联病程
-rom,affected_side,select,yes,doctor,患侧；据此解释患侧与健侧膝列
-rom,reference_knee_side,select,yes,therapist,健侧或对照侧
+assessments,activity_pain_vas,number,yes,patient/clinician,指定负荷活动疼痛 0–10
+assessments,return_to_activity_status,select,yes,patient/clinician,当前重返活动状态
+assessments,week_no,number,yes,therapist,本次康复周数
+assessments,phase,select,yes,therapist,症状管理/恢复/重建/重返活动
+assessments,adherence_percent,number,no,therapist/patient,康复依从性
+rom,patient_id,text,yes,system/user,唯一可见关联字段
+rom,timepoint,select,yes,therapist,对应随访节点
+rom,measured_at,date,yes,system/user,测量日期；与患者ID和节点共同用于后台更新
 rom,affected_knee_flexion_deg,number,no,therapist,患侧膝屈曲角度
 rom,affected_knee_extension_deficit_deg,number,no,therapist,患侧膝伸展受限；0=完全伸直
 rom,reference_knee_flexion_deg,number,no,therapist,健侧膝屈曲角度
 rom,reference_knee_extension_deficit_deg,number,no,therapist,健侧膝伸展受限；0=完全伸直
-rom,affected_hip_flexion_deg,number,no,therapist,患侧髋屈曲角度
-rom,affected_hip_extension_deg,number,no,therapist,患侧髋伸展角度
-rom,affected_hip_internal_rotation_deg,number,no,therapist,患侧髋内旋角度
-rom,affected_hip_external_rotation_deg,number,no,therapist,患侧髋外旋角度
+rom,affected_hip_flexion_deg,number,no,therapist,患侧髋屈伸及内外旋角度
 rom,affected_ankle_knee_to_wall_cm,number,no,therapist,患侧踝膝靠墙距离
-rom,method,select,yes,therapist,量角器/倾角仪/目测/其他
-rom,assessor,text,yes,therapist,评估者
-rom,measured_at,date/time,yes,system/user,测量时间
-rehab,rehab_id,text,yes,system,疾病事件+康复周的稳定身份
-rehab,episode_id,text,yes,system,关联疾病事件
-rehab,week_no,number,yes,therapist,康复周数
-rehab,phase,select,yes,therapist,症状管理/恢复/重建/重返活动
-rehab,supervised_sessions,number,yes,therapist,该周监督治疗次数
-rehab,home_training_days,number,yes,therapist/patient,该周居家训练天数
-rehab,adherence_percent,number,no,therapist/patient,按共同目标计算；分母须可追溯
-rehab,pain_during_load_nrs,number,yes,patient/therapist,训练负荷时疼痛 0–10
-rehab,pain_24h_after_nrs,number,yes,patient/therapist,训练后 24 小时疼痛 0–10
-rehab,therapist_interpretation,text,no,therapist,简短解释
-followup_summary,episode_id,text,yes,system,每个病程一行的随访总览稳定身份
-followup_summary,patient_id,text,yes,system,关联患者
-followup_summary,baseline_date,date,no,system,已保存基线日期
+followup_summary,patient_id,text,yes,system/user,每位患者一行的随访总览
 followup_summary,baseline_visa_p_total,number,no,system,已保存基线 VISA-P
 followup_summary,baseline_activity_pain_vas,number,no,system,已保存基线 VAS
-followup_summary,latest_date,date,yes,system,最近保存评估日期
-followup_summary,latest_timepoint,select,yes,system,最近保存随访节点
 followup_summary,latest_visa_p_total,number,no,system,最近 VISA-P
 followup_summary,latest_activity_pain_vas,number,yes,system,最近 VAS
 followup_summary,visa_p_change_from_baseline,calculated,no,system,基线与最近评估均完成才计算
 followup_summary,pain_change_from_baseline,calculated,no,system,基线与最近评估均有 VAS 才计算
-followup_summary,return_to_activity_status,select,yes,assessment,最近恢复状态
-followup_summary,escalation_or_surgery,select,yes,doctor,无/复评/转诊/已手术
-followup_summary,escalation_reason,text,no,doctor,最近升级治疗原因
-reports,report_id,text,yes,system,评估+报告版本的稳定身份
-reports,assessment_id,text,yes,system,关联评估
-reports,evidence_version,text,yes,system,证据/模型版本
-reports,model_status,select,yes,system,数据采集与趋势计算
-reports,patient_report_text,text,yes,system,可编辑的患者解释
-reports,medical_record_text,text,yes,system,可编辑的病历文本

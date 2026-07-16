@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from domain import assessment_identity, patient_id_from_record, stable_id
+from domain import patient_id_from_record
 from questionnaires import calculate_visa_p
 from storage import LocalStorage, TABLE_FILES
 
@@ -20,7 +20,6 @@ class SyntheticWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = LocalStorage(directory)
             patient_id = patient_id_from_record("SYNTHETIC-001", "演练患者")
-            identity = assessment_identity(patient_id, "左", "基线", date(2026, 7, 14))
             score = calculate_visa_p(
                 {
                     "q1": 10,
@@ -43,43 +42,24 @@ class SyntheticWorkflowTests(unittest.TestCase):
                     "name": "演练患者",
                     "consent_status": "synthetic-test-only",
                 },
-                "episodes": {
-                    "episode_id": identity.episode_id,
-                    "patient_id": patient_id,
-                    "affected_side": "左",
-                    "status": "新诊断",
-                },
                 "assessments": {
-                    "assessment_id": identity.assessment_id,
                     "patient_id": patient_id,
-                    "episode_id": identity.episode_id,
                     "timepoint": "基线",
+                    "assessment_date": date(2026, 7, 14),
                     "visa_p_total": score,
                     "visa_p_completion_status": "completed",
                 },
                 "rom": {
-                    "rom_id": stable_id("PT-ROM", identity.assessment_id),
-                    "assessment_id": identity.assessment_id,
                     "patient_id": patient_id,
+                    "timepoint": "基线",
+                    "measured_at": date(2026, 7, 14),
                     "affected_knee_flexion_deg": 135,
                     "reference_knee_flexion_deg": 135,
                 },
-                "rehab": {
-                    "rehab_id": stable_id("PT-R", identity.episode_id, 1),
-                    "episode_id": identity.episode_id,
-                    "week_no": 1,
-                    "phase": "症状管理",
-                },
                 "followup_summary": {
-                    "episode_id": identity.episode_id,
                     "patient_id": patient_id,
                     "latest_timepoint": "基线",
                     "latest_visa_p_total": score,
-                },
-                "reports": {
-                    "report_id": stable_id("PT-REP", identity.assessment_id, "PT-v0.1-trend-only-2026-07-14"),
-                    "assessment_id": identity.assessment_id,
-                    "model_status": "数据采集与趋势计算",
                 },
             }
 

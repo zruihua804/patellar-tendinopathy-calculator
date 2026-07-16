@@ -10,9 +10,9 @@ class FeishuAdapterTests(unittest.TestCase):
             FeishuConfig.from_mapping({"app_id": "a", "app_secret": "b"})
 
     def test_formats_typed_fields_without_json_columns(self):
-        fields = format_record_fields("assessments", {"assessment_id": "PT-A-1", "assessment_date": date(2026, 7, 14), "activity_pain_nrs": 3.5, "visa_p_total": 55, "visa_p_completion_status": "completed"})
-        self.assertEqual(fields["评估ID"], "PT-A-1")
-        self.assertEqual(fields["指定负荷疼痛NRS"], 3.5)
+        fields = format_record_fields("assessments", {"patient_id": "PT-P-1", "timepoint": "基线", "assessment_date": date(2026, 7, 14), "activity_pain_vas": 3.5, "visa_p_total": 55, "visa_p_completion_status": "completed"})
+        self.assertEqual(fields["患者ID"], "PT-P-1")
+        self.assertEqual(fields["指定负荷疼痛VAS"], 3.5)
         self.assertEqual(fields["VISA-P总分"], 55.0)
         self.assertIsInstance(fields["评估日期"], int)
 
@@ -20,9 +20,9 @@ class FeishuAdapterTests(unittest.TestCase):
         fields = format_record_fields(
             "rom",
             {
-                "rom_id": "PT-ROM-1",
-                "assessment_id": "PT-A-1",
                 "patient_id": "PT-P-1",
+                "timepoint": "基线",
+                "measured_at": date(2026, 7, 14),
                 "affected_side": "左",
                 "affected_knee_flexion_deg": 135,
                 "reference_knee_flexion_deg": 140,
