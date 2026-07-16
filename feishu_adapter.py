@@ -250,19 +250,50 @@ class FeishuBitableClient:
         return removed
 
     def delete_retired_id_fields(self, app_token: str) -> list[str]:
-        """Remove only obsolete opaque-ID columns from the retained tables."""
+        """Remove obsolete opaque-ID columns without deleting Feishu's mandatory primary field.
+
+        Older prototype tables used an assessment/ROM ID as the primary column.
+        Feishu does not permit deleting that column, so it is converted into the
+        single patient-ID column after copying values from the existing patient
+        ID field.  The duplicate non-primary patient-ID field is then removed.
+        """
         existing = {str(row.get("name")): str(row.get("table_id")) for row in self.list_tables(app_token)}
         removed: list[str] = []
         for table_name, field_names in RETIRED_FIELD_NAMES_BY_TABLE.items():
             table_id = existing.get(table_name)
             if not table_id:
                 continue
-            fields = {str(row.get("field_name")): str(row.get("field_id")) for row in self.list_fields(app_token, table_id)}
+            field_rows = self.list_fields(app_token, table_id)
+            fields = {str(row.get("field_name")): row for row in field_rows}
             for field_name in field_names:
-                field_id = fields.get(field_name)
-                if field_id:
+                field = fields.get(field_name)
+                if not field:
+                    continue
+                field_id = str(field.get("field_id"))
+                if not field.get("is_primary"):
                     self._request("DELETE", f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{field_id}")
                     removed.append(f"{table_name}·{field_name}")
+                    continue
+
+                patient_field = fields.get("患者ID")
+                if patient_field and not patient_field.get("is_primary"):
+                    patient_field_id = str(patient_field.get("field_id"))
+                    for record in self.list_records(app_token, table_id):
+                        patient_id = record.get("fields", {}).get("患者ID")
+                        if patient_id not in (None, ""):
+                            self._request(
+                                "PUT",
+                                f"/bitable/v1/apps/{app_token}/tables/{table_id}/records/{record['record_id']}",
+                                {"fields": {field_name: patient_id}},
+                            )
+                    self._request("DELETE", f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{patient_field_id}")
+
+                self._request(
+                    "PUT",
+                    f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{field_id}",
+                    {"field_name": "患者ID"},
+                )
+                removed.append(f"{table_name}·{field_name}（已转为患者ID主列）")
         return removed
 
     def upsert_record(self, app_token: str, table_id: str, table_key: str, record: dict[str, Any]) -> str:
