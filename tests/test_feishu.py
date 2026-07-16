@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from feishu import FeishuConfig, FeishuConfigurationError, format_record_fields
+from feishu_adapter import FeishuConfig, FeishuConfigurationError, format_record_fields
 
 
 class FeishuAdapterTests(unittest.TestCase):

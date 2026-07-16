@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from domain import REHAB_PHASES, RETURN_TO_ACTIVITY, TIMEPOINTS, clinical_warnings, patient_id_from_record
-from feishu import RETIRED_TABLE_NAMES, FeishuAPIError, FeishuBitableClient, FeishuConfig, FeishuConfigurationError
+from feishu_adapter import RETIRED_TABLE_NAMES, FeishuAPIError, FeishuBitableClient, FeishuConfig, FeishuConfigurationError
 from model import MODEL_VERSION, evidence_scenario_summary, return_to_sport_reference, trend_summary
 from patient_ocr import OCRUnavailableError, extract_patient_screenshot_data
 from questionnaires import (

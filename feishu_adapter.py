@@ -1,4 +1,4 @@
-"""Non-destructive Feishu Base adapter for the patellar-tendinopathy calculator."""
+"""Feishu Base adapter for the patellar-tendinopathy calculator."""
 
 from __future__ import annotations
 
