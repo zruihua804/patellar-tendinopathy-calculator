@@ -27,7 +27,7 @@ from storage import DEFAULT_STORAGE, DuplicateRecordError
 
 st.set_page_config(page_title="髌腱病临床计算器", page_icon="🦵", layout="wide")
 
-APP_RELEASE = "PT-v0.4.1-patient-id-tables-2026-07-16"
+APP_RELEASE = "PT-v0.4.2-patient-id-tables-2026-07-16"
 
 
 def init_state() -> None:
@@ -616,8 +616,7 @@ def render_sidebar() -> None:
             with st.expander("管理员：清理旧表", expanded=True):
                 st.caption("保留：患者主表、髌腱病评估表、ROM 综合评估、患者随访总览。")
                 st.caption("删除旧表：" + "、".join(RETIRED_TABLE_NAMES) + "；并移除保留表内旧的评估/病程/ROM ID 列。此操作不可恢复。")
-                confirmed = st.checkbox("我确认执行旧表与旧 ID 列清理", key="confirm_retired_table_cleanup")
-                if st.button("清理旧表与旧 ID 列", disabled=not confirmed, key="delete_retired_feishu_tables", type="secondary"):
+                if st.button("清理旧表与旧 ID 列", key="delete_retired_feishu_tables", type="secondary"):
                     try:
                         client = FeishuBitableClient(config)
                         token = client.resolve_bitable_token()
