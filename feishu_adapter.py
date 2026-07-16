@@ -291,7 +291,7 @@ class FeishuBitableClient:
                 self._request(
                     "PUT",
                     f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{field_id}",
-                    {"field_name": "患者ID"},
+                    {"field_name": "患者ID", "type": field.get("type")},
                 )
                 removed.append(f"{table_name}·{field_name}（已转为患者ID主列）")
         return removed
