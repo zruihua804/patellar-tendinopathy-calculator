@@ -56,3 +56,16 @@ def medical_record_text(assessment: dict[str, Any], rom_rows: list[dict[str, Any
         f"踝膝靠墙 {_value(ankle, 'knee_to_wall_cm', '未测')} cm；测量方法 {_value(knee_affected, 'method')}。\n"
         f"随访解释：{trend.interpretation}"
     )
+
+
+def medical_record_text_english(assessment: dict[str, Any], rom: dict[str, Any], trend: TrendSummary) -> str:
+    """Concise English counterpart generated from the same structured record."""
+    return (
+        f"Patellar tendinopathy assessment: {_value(assessment, 'affected_side')} side; symptom duration {_value(assessment, 'symptom_duration_weeks')} weeks. "
+        f"Load-related pain during {_value(assessment, 'pain_activity_description')}: VAS {_value(assessment, 'activity_pain_vas', _value(assessment, 'activity_pain_nrs'))}/10. "
+        f"VISA-P {_value(assessment, 'visa_p_total')}/100.\n"
+        f"ROM: affected knee flexion {_value(rom, 'affected_knee_flexion_deg', 'not measured')}°, extension deficit {_value(rom, 'affected_knee_extension_deficit_deg', 'not measured')}°; "
+        f"contralateral knee flexion {_value(rom, 'reference_knee_flexion_deg', 'not measured')}°, extension deficit {_value(rom, 'reference_knee_extension_deficit_deg', 'not measured')}°. "
+        f"Patellar tendon thickness on the affected side: {_value(assessment, 'ultrasound_tendon_thickness_mm', 'not recorded')} mm.\n"
+        f"Follow-up interpretation: {trend.interpretation}"
+    )

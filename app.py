@@ -21,13 +21,16 @@ from questionnaires import (
     training_option_label,
     visa_p_completion_status,
 )
-from reporting import medical_record_text, patient_report
+from reporting import medical_record_text, medical_record_text_english, patient_report
 from storage import DEFAULT_STORAGE, DuplicateRecordError
 
 
 st.set_page_config(page_title="髌腱病临床计算器", page_icon="🦵", layout="wide")
 
-APP_RELEASE = "PT-v0.4.2-patient-id-tables-2026-07-16"
+APP_RELEASE = "PT-v0.5-longitudinal-outcomes-2026-07-17"
+
+PRIMARY_LOAD_OPTIONS = ["跳跃/落地训练", "篮球", "排球", "羽毛球", "跑步", "足球", "网球/匹克球", "力量训练", "舞蹈/体操", "体力劳动", "久坐办公", "其他"]
+PAIN_ACTIVITY_OPTIONS = ["跳跃落地", "单腿跳/连续跳", "跑步加速或冲刺", "爬楼/下楼", "深蹲", "弓步/蹲起", "久坐后起立", "训练后", "其他"]
 
 
 def init_state() -> None:
@@ -38,6 +41,8 @@ def init_state() -> None:
         "sex": "待确认",
         "birth_date": date(1990, 1, 1),
         "consent_status": "待确认",
+        "height_cm": 170.0,
+        "weight_kg": 65.0,
         "affected_side": "左",
         "episode_status": "新诊断",
         "diagnostic_confidence": "确诊",
@@ -45,17 +50,22 @@ def init_state() -> None:
         "symptom_duration_weeks": 12,
         "doctor": "",
         "therapist": "",
-        "primary_activity": "跳跃/落地",
+        "primary_activity": "跳跃/落地训练",
+        "primary_activity_other": "",
         "recent_load_change": "未记录",
         "assessment_date": date.today(),
         "timepoint": "基线",
         "source_role": "doctor-assisted",
         "activity_pain_vas": 3.0,
         "pain_activity_description": "跳跃落地",
+        "pain_activity_other": "",
         "target_sport": "",
         "target_activity_level": "休闲运动",
         "return_to_activity_status": "未恢复",
         "imaging_summary": "",
+        "ultrasound_tendon_thickness_mm": 0.0,
+        "ultrasound_date": date.today(),
+        "ultrasound_note": "",
         "clinical_notes": "",
         "affected_knee_flexion_deg": 135,
         "affected_knee_extension_deficit_deg": 0,
@@ -132,6 +142,10 @@ def patient_profile_by_id(patient_id: str) -> tuple[dict[str, object] | None, st
                         "name": fields.get("姓名", ""),
                         "sex": fields.get("性别", "待确认"),
                         "birth_date": fields.get("出生日期"),
+                        "height_cm": fields.get("身高（cm）", 170),
+                        "weight_kg": fields.get("体重（kg）", 65),
+                        "target_sport": fields.get("目标运动", ""),
+                        "target_activity_level": fields.get("目标运动水平", "休闲运动"),
                         "consent_status": fields.get("同意状态", "待确认"),
                     }, "飞书患者主表"
         except (FeishuConfigurationError, FeishuAPIError, ValueError):
@@ -140,6 +154,40 @@ def patient_profile_by_id(patient_id: str) -> tuple[dict[str, object] | None, st
         if str(row.get("patient_id", "")) == patient_id:
             return row, "本地原型记录"
     return None, ""
+
+
+def bmi_value() -> float | None:
+    height_m = float(st.session_state.height_cm) / 100
+    if height_m <= 0:
+        return None
+    return round(float(st.session_state.weight_kg) / (height_m * height_m), 1)
+
+
+def selected_history_row(history: list[dict[str, object]], timepoint: str) -> dict[str, object] | None:
+    candidates = [normalise_history_row(row) for row in history if str(normalise_history_row(row).get("timepoint")) == timepoint]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda row: _date_sort_value(row.get("assessment_date")))
+
+
+def render_patient_history_strip(patient_id: str) -> None:
+    if not patient_id:
+        return
+    history, _ = saved_assessment_history(patient_id)
+    if not history:
+        st.caption("尚无已保存评估；完成首诊后会在这里显示基线与随访记录。")
+        return
+    rows = []
+    for point in TIMEPOINTS:
+        row = selected_history_row(history, point)
+        if row:
+            visa = row.get("visa_p_total") if row.get("visa_p_total") not in (None, "") else "—"
+            vas = row.get("activity_pain_vas") if row.get("activity_pain_vas") not in (None, "") else "—"
+            rows.append({"节点": point, "状态": "已记录", "VISA-P": visa, "VAS": vas, "日期": row.get("assessment_date", "")})
+        else:
+            rows.append({"节点": point, "状态": "未记录", "VISA-P": "—", "VAS": "—", "日期": ""})
+    st.caption("患者历史概览（选择随访节点后会显示对应的已保存评分）")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
 def render_patient_screenshot_import() -> None:
@@ -213,6 +261,10 @@ def render_patient_entry() -> None:
                     birth = profile["birth_date"]
                     st.session_state.birth_date = pd.to_datetime(birth, unit="ms" if isinstance(birth, (int, float)) else None).date()
                 st.session_state.consent_status = str(profile.get("consent_status", "待确认"))
+                st.session_state.height_cm = float(profile.get("height_cm") or 170)
+                st.session_state.weight_kg = float(profile.get("weight_kg") or 65)
+                st.session_state.target_sport = str(profile.get("target_sport", ""))
+                st.session_state.target_activity_level = str(profile.get("target_activity_level", "休闲运动"))
                 st.session_state.patient_profile_notice = f"已从{source}带入患者基础资料；本次随访无需重复录入。"
                 st.rerun()
         if notice := st.session_state.pop("patient_profile_notice", ""):
@@ -223,14 +275,28 @@ def render_patient_entry() -> None:
         st.date_input("出生日期", key="birth_date")
         st.selectbox("数据使用同意状态", ["已同意", "未同意", "待确认"], key="consent_status")
         st.selectbox("患侧", ["左", "右", "双侧"], key="affected_side")
+        height, weight = st.columns(2)
+        with height:
+            st.number_input("身高（cm）", min_value=100.0, max_value=230.0, step=0.5, key="height_cm")
+        with weight:
+            st.number_input("体重（kg）", min_value=25.0, max_value=250.0, step=0.5, key="weight_kg")
+        st.metric("BMI（自动计算）", "—" if bmi_value() is None else f"{bmi_value():.1f}")
+        st.text_input("目标运动", key="target_sport", placeholder="例如：篮球、跑步、排球")
+        st.selectbox("目标运动水平（自述）", ["日常活动", "休闲运动", "校队/业余竞赛", "半职业", "职业/精英"], key="target_activity_level")
+        render_patient_history_strip(str(st.session_state.patient_id).strip())
     with right:
         st.selectbox("病程状态", ["新诊断", "保守康复中", "复评", "已结束"], key="episode_status")
         st.selectbox("临床诊断把握度", ["确诊", "高度怀疑", "待鉴别"], key="diagnostic_confidence")
         st.number_input("症状持续时间（周）", min_value=0, max_value=520, step=1, key="symptom_duration_weeks")
-        st.text_input("主运动/工作负荷", key="primary_activity")
+        st.selectbox("主运动/工作负荷", PRIMARY_LOAD_OPTIONS, key="primary_activity")
+        if st.session_state.primary_activity == "其他":
+            st.text_input("其他主运动/工作负荷", key="primary_activity_other")
         st.text_input("近期负荷变化", key="recent_load_change")
         st.text_input("主管医生", key="doctor")
         st.text_input("康复治疗师", key="therapist")
+        st.number_input("患侧髌腱厚度（mm）", min_value=0.0, max_value=20.0, step=0.1, key="ultrasound_tendon_thickness_mm", help="建议使用团队统一的超声测量位置；该指标用于影像背景记录，不直接计算恢复概率。")
+        st.date_input("超声检查日期", key="ultrasound_date")
+        st.text_input("超声备注（可选）", key="ultrasound_note", placeholder="如测量位置、低回声或血流描述")
         st.checkbox("红旗或需要优先排除的情况（疑似断裂、伸膝无力、全身症状、明显积血/锁定等）", key="red_flag_present")
     if not st.session_state.patient_id and st.session_state.medical_record_no:
         if st.button("根据病历号生成患者 ID"):
@@ -247,9 +313,17 @@ def render_visa_p() -> int | None:
     st.caption(f"来源版本：{VISA_P_SOURCE_VERSION}。共 8 项、总分 0–100；分数越高表示症状更轻、功能更好。")
     st.selectbox("评估时间点", TIMEPOINTS, key="timepoint")
     st.date_input("评估日期", key="assessment_date")
-    st.selectbox("填写来源", ["patient", "doctor-assisted", "therapist-assisted"], key="source_role")
+    patient_id = str(st.session_state.patient_id).strip()
+    history, _ = saved_assessment_history(patient_id)
+    saved = selected_history_row(history, st.session_state.timepoint)
+    if saved:
+        saved_visa = saved.get("visa_p_total") if saved.get("visa_p_total") not in (None, "") else "—"
+        saved_vas = saved.get("activity_pain_vas") if saved.get("activity_pain_vas") not in (None, "") else "—"
+        st.info(f"已保存的{st.session_state.timepoint}结果：VISA-P {saved_visa}/100；VAS {saved_vas}/10。重新填写并保存将更新该节点。")
     st.slider("指定负荷活动疼痛 VAS（0=无痛，10=最痛）", min_value=0.0, max_value=10.0, value=float(st.session_state.activity_pain_vas), step=0.5, key="activity_pain_vas")
-    st.text_input("疼痛对应的指定负荷活动", key="pain_activity_description")
+    st.selectbox("疼痛对应的指定负荷活动", PAIN_ACTIVITY_OPTIONS, key="pain_activity_description")
+    if st.session_state.pain_activity_description == "其他":
+        st.text_input("其他疼痛活动场景", key="pain_activity_other")
     answers: dict[str, object] = {}
     for item in VISA_P_ITEMS:
         st.markdown(f"**{item.key[1:]}. {item.text}**")
@@ -394,11 +468,54 @@ def table_records(records: dict[str, object]) -> list[tuple[str, dict[str, objec
     return flattened
 
 
+def save_sections_to_feishu(records: dict[str, object], tables: list[str], success_message: str) -> None:
+    if not st.session_state.medical_record_no or not st.session_state.patient_name:
+        st.error("请先确认病历号和姓名，再保存。")
+        return
+    config = configured_feishu()
+    if not config:
+        st.error("尚未配置飞书连接，无法保存。")
+        return
+    try:
+        client = FeishuBitableClient(config)
+        token = client.resolve_bitable_token()
+        table_ids = client.ensure_schema(token)
+        for table in tables:
+            client.upsert_record(token, table_ids[table], table, dict(records[table]))
+        st.session_state.save_notice = success_message
+        st.rerun()
+    except (FeishuConfigurationError, FeishuAPIError, ValueError) as exc:
+        st.error(f"飞书同步失败：{exc}")
+
+
+def render_section_save(section: str) -> None:
+    patient_id = st.session_state.patient_id or patient_id_from_record(st.session_state.medical_record_no, st.session_state.patient_name)
+    history, _ = saved_assessment_history(patient_id)
+    records, _, _ = build_records(history)
+    if section == "initial":
+        assessment = records["assessments"]
+        records["assessments"] = {key: assessment[key] for key in ("patient_id", "timepoint", "assessment_date", "affected_side", "episode_status", "symptom_duration_weeks", "diagnostic_confidence", "red_flag_present", "doctor", "therapist", "primary_activity", "recent_load_change", "ultrasound_tendon_thickness_mm", "ultrasound_date", "ultrasound_note")}
+        if st.button("保存首诊资料并同步飞书", type="primary", key="save_initial_section"):
+            save_sections_to_feishu(records, ["patients", "assessments"], "首诊资料已保存；可继续填写评分与 ROM。")
+    elif section == "scores":
+        assessment = records["assessments"]
+        records["assessments"] = {key: assessment[key] for key in ("patient_id", "timepoint", "assessment_date", "activity_pain_vas", "pain_activity_description", "visa_p_total", "adherence_percent", "phase", "return_to_activity_status")}
+        if st.button("保存本次临床评分并同步飞书", type="primary", key="save_score_section"):
+            save_sections_to_feishu(records, ["assessments"], f"{st.session_state.timepoint} 的 VAS 与 VISA-P 已保存。")
+    elif section == "rom":
+        if st.button("保存本次 ROM 并同步飞书", type="primary", key="save_rom_section"):
+            save_sections_to_feishu(records, ["rom"], f"{st.session_state.timepoint} 的 ROM 已保存。")
+
+
 def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], list[str], object]:
-    score = st.session_state.get("current_visa_p_total")
+    saved_current = selected_history_row(history, str(st.session_state.timepoint))
+    entered_score = st.session_state.get("current_visa_p_total")
+    score = entered_score if entered_score is not None else (saved_current or {}).get("visa_p_total")
     status = visa_p_completion_status(st.session_state.get("current_visa_answers", {}))
     patient_id = st.session_state.patient_id or patient_id_from_record(st.session_state.medical_record_no, st.session_state.patient_name)
     pain_vas = float(st.session_state.activity_pain_vas)
+    primary_activity = st.session_state.primary_activity_other.strip() if st.session_state.primary_activity == "其他" else st.session_state.primary_activity
+    pain_activity = st.session_state.pain_activity_other.strip() if st.session_state.pain_activity_description == "其他" else st.session_state.pain_activity_description
     warnings = clinical_warnings(red_flag_present=bool(st.session_state.red_flag_present), diagnostic_confidence=str(st.session_state.diagnostic_confidence), visa_p_total=score, activity_pain_nrs=pain_vas)
     assessment = {
         "patient_id": patient_id,
@@ -406,29 +523,21 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
         "assessment_date": st.session_state.assessment_date,
         "affected_side": st.session_state.affected_side,
         "symptom_duration_weeks": st.session_state.symptom_duration_weeks,
-        "activity_pain_nrs": pain_vas,
         "activity_pain_vas": pain_vas,
-        "pain_activity_description": st.session_state.pain_activity_description,
+        "pain_activity_description": pain_activity,
         "visa_p_total": score,
-        "visa_p_completion_status": status,
-        "visa_p_respondent_source": st.session_state.source_role if status == "completed" else "not completed",
-        "target_sport": st.session_state.target_sport,
-        "target_activity_level": st.session_state.target_activity_level,
         "return_to_activity_status": st.session_state.return_to_activity_status,
         "episode_status": st.session_state.episode_status,
-        "primary_activity": st.session_state.primary_activity,
+        "primary_activity": primary_activity,
         "recent_load_change": st.session_state.recent_load_change,
         "doctor": st.session_state.doctor,
         "therapist": st.session_state.therapist,
         "week_no": st.session_state.rehab_week_no,
         "phase": st.session_state.rehab_phase,
-        "supervised_sessions": st.session_state.supervised_sessions,
-        "home_training_days": st.session_state.home_training_days,
         "adherence_percent": st.session_state.adherence_percent,
-        "pain_during_load_nrs": st.session_state.pain_during_load_nrs,
-        "pain_24h_after_nrs": st.session_state.pain_24h_after_nrs,
-        "therapist_interpretation": st.session_state.therapist_interpretation,
-        "warnings": "；".join(warnings),
+        "ultrasound_tendon_thickness_mm": st.session_state.ultrasound_tendon_thickness_mm or None,
+        "ultrasound_date": st.session_state.ultrasound_date,
+        "ultrasound_note": st.session_state.ultrasound_note,
     }
     merged_history = with_current_assessment(history, assessment)
     baseline_visa, baseline_pain = baseline_for(merged_history, assessment)
@@ -456,27 +565,10 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
         "assessor": assessor,
         "measured_at": st.session_state.assessment_date,
     }
-    baseline_row = next((row for row in merged_history if row.get("timepoint") == "基线"), None)
-    followup_summary = {
-        "patient_id": patient_id,
-        "baseline_date": baseline_row.get("assessment_date") if baseline_row else None,
-        "baseline_visa_p_total": baseline_visa,
-        "baseline_activity_pain_vas": baseline_pain,
-        "latest_date": st.session_state.assessment_date,
-        "latest_timepoint": st.session_state.timepoint,
-        "latest_visa_p_total": score,
-        "latest_activity_pain_vas": pain_vas,
-        "visa_p_change_from_baseline": trend.visa_p_delta,
-        "pain_change_from_baseline": trend.pain_delta,
-        "return_to_activity_status": st.session_state.return_to_activity_status,
-        "escalation_or_surgery": st.session_state.escalation_or_surgery,
-        "escalation_reason": st.session_state.escalation_reason,
-    }
     records: dict[str, object] = {
-        "patients": {"patient_id": patient_id, "medical_record_no": st.session_state.medical_record_no, "name": st.session_state.patient_name, "sex": st.session_state.sex, "birth_date": st.session_state.birth_date, "consent_status": st.session_state.consent_status},
+        "patients": {"patient_id": patient_id, "medical_record_no": st.session_state.medical_record_no, "name": st.session_state.patient_name, "sex": st.session_state.sex, "birth_date": st.session_state.birth_date, "height_cm": st.session_state.height_cm, "weight_kg": st.session_state.weight_kg, "bmi": bmi_value(), "target_sport": st.session_state.target_sport, "target_activity_level": st.session_state.target_activity_level, "consent_status": st.session_state.consent_status},
         "assessments": assessment,
         "rom": rom,
-        "followup_summary": followup_summary,
     }
     return records, warnings, trend
 
@@ -526,8 +618,6 @@ def render_report_and_save() -> None:
         st.success(notice)
     left, right = st.columns(2)
     with left:
-        st.text_input("希望重返的运动", key="target_sport", placeholder="例如：篮球、跑步、排球")
-        st.selectbox("目标运动水平（自述）", ["日常活动", "休闲运动", "校队/业余竞赛", "半职业", "职业/精英"], key="target_activity_level")
         st.selectbox("重返活动状态", RETURN_TO_ACTIVITY, key="return_to_activity_status")
     with right:
         st.selectbox("升级治疗/手术状态", ["无", "复评", "转诊", "已手术"], key="escalation_or_surgery")
@@ -573,36 +663,15 @@ def render_report_and_save() -> None:
     report = {
         "patient_report_text": patient_report(current, trend),
         "medical_record_text": medical_record_text(current, dict(records["rom"]), trend),
+        "medical_record_text_english": medical_record_text_english(current, dict(records["rom"]), trend),
     }
     with st.expander("供临床人员复制的简明文字", expanded=False):
         st.text_area("患者简明文字", value=str(report["patient_report_text"]), height=150, key="patient_report_preview")
-        st.text_area("病历文本", value=str(report["medical_record_text"]), height=210, key="medical_record_preview")
+        st.text_area("病历文本（中文）", value=str(report["medical_record_text"]), height=190, key="medical_record_preview")
+        st.text_area("Clinical note (English)", value=str(report["medical_record_text_english"]), height=190, key="medical_record_english_preview")
 
     st.divider()
-    if st.button("保存到本地临床记录", type="primary"):
-        if not st.session_state.medical_record_no or not st.session_state.patient_name:
-            st.error("请先确认病历号和姓名，再保存。")
-            return
-        try:
-            statuses = [f"{table}: {DEFAULT_STORAGE.upsert_record(table, record)[0]}" for table, record in table_records(records)]
-            st.session_state.save_notice = "本地保存完成（" + "；".join(statuses) + "）。随访图已自动刷新。"
-            st.rerun()
-        except (ValueError, DuplicateRecordError) as exc:
-            st.error(str(exc))
-
-    if not config:
-        return
-    if st.button("保存并同步到飞书多维表格"):
-        try:
-            client = FeishuBitableClient(config)
-            token = client.resolve_bitable_token()
-            table_ids = client.ensure_schema(token)
-            for table, record in table_records(records):
-                client.upsert_record(token, table_ids[table], table, record)
-            st.session_state.save_notice = "已保存并同步飞书；随访图已自动从飞书记录刷新。"
-            st.rerun()
-        except (FeishuConfigurationError, FeishuAPIError, ValueError) as exc:
-            st.error(f"本地记录未受影响；飞书同步失败：{exc}")
+    st.caption("请使用首诊资料、临床评分或康复评估页内的保存按钮。报告会自动读取已保存的患者纵向记录。")
 
 
 def render_sidebar() -> None:
@@ -614,16 +683,17 @@ def render_sidebar() -> None:
             st.link_button("打开飞书数据库", config.bitable_url, use_container_width=True)
         if config:
             with st.expander("管理员：清理旧表", expanded=True):
-                st.caption("保留：患者主表、髌腱病评估表、ROM 综合评估、患者随访总览。")
-                st.caption("删除旧表：" + "、".join(RETIRED_TABLE_NAMES) + "；并移除保留表内旧的评估/病程/ROM ID 列。此操作不可恢复。")
-                if st.button("清理旧表与旧 ID 列", key="delete_retired_feishu_tables", type="secondary"):
+                st.caption("保留：患者主表、髌腱病评估表、ROM 综合评估。")
+                st.caption("删除旧表：" + "、".join(RETIRED_TABLE_NAMES) + "；并只保留上述三张表的标准字段。此操作不可恢复。")
+                if st.button("清理重复列与旧表", key="delete_retired_feishu_tables", type="secondary"):
                     try:
                         client = FeishuBitableClient(config)
                         token = client.resolve_bitable_token()
                         client.ensure_schema(token)
                         removed = client.delete_retired_tables(token)
                         removed_fields = client.delete_retired_id_fields(token)
-                        summary = removed + removed_fields
+                        pruned = client.prune_to_current_schema(token)
+                        summary = removed + removed_fields + pruned
                         st.success("已清理：" + ("、".join(summary) if summary else "未发现需要清理的旧表或旧 ID 列") + "。")
                     except (FeishuConfigurationError, FeishuAPIError, ValueError) as exc:
                         st.error(f"旧表清理失败：{exc}")
@@ -645,10 +715,13 @@ def main() -> None:
     tabs = st.tabs(["① 首诊资料", "② VISA-P", "③ 康复评估", "④ 报告与保存"])
     with tabs[0]:
         render_patient_entry()
+        render_section_save("initial")
     with tabs[1]:
         render_visa_p()
+        render_section_save("scores")
     with tabs[2]:
         render_therapist_entry()
+        render_section_save("rom")
     with tabs[3]:
         render_report_and_save()
 

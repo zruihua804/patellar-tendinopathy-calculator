@@ -1,7 +1,7 @@
 import unittest
 
 from model import return_to_sport_reference, trend_summary
-from reporting import medical_record_text, patient_report
+from reporting import medical_record_text, medical_record_text_english, patient_report
 
 
 class ModelAndReportingTests(unittest.TestCase):
@@ -29,6 +29,13 @@ class ModelAndReportingTests(unittest.TestCase):
         report = medical_record_text(assessment, rom, trend_summary(50, 55, 5, 4))
         self.assertIn("右侧膝屈曲 135°", report)
         self.assertIn("患侧髋屈曲 120°", report)
+
+    def test_english_note_uses_same_structured_values(self):
+        assessment = {"affected_side": "左", "symptom_duration_weeks": 12, "pain_activity_description": "jump landing", "activity_pain_vas": 3, "visa_p_total": 62, "ultrasound_tendon_thickness_mm": 5.1}
+        rom = {"affected_knee_flexion_deg": 130, "affected_knee_extension_deficit_deg": 0, "reference_knee_flexion_deg": 135, "reference_knee_extension_deficit_deg": 0}
+        note = medical_record_text_english(assessment, rom, trend_summary(50, 62, 5, 3))
+        self.assertIn("VISA-P 62/100", note)
+        self.assertIn("5.1 mm", note)
 
     def test_return_to_sport_reference_uses_stable_literature_anchors(self):
         reference = return_to_sport_reference(

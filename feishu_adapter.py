@@ -89,12 +89,10 @@ def check(key: str, name: str) -> FieldSpec:
 
 
 TABLE_SPECS: tuple[TableSpec, ...] = (
-    TableSpec("patients", "患者主表", (text("patient_id", "患者ID"), text("medical_record_no", "病历号"), text("name", "姓名"), choice("sex", "性别", "男", "女", "待确认"), when("birth_date", "出生日期"), choice("consent_status", "同意状态", "已同意", "未同意", "待确认"), when("saved_at", "保存时间")), ("patient_id",)),
-    # One record = one patient at one dated follow-up point.  The natural key
-    # is used only by the adapter and is deliberately not exposed as a column.
-    TableSpec("assessments", "髌腱病评估表", (text("patient_id", "患者ID"), choice("timepoint", "评估节点", "基线", "6周", "12周", "6个月", "12个月"), when("assessment_date", "评估日期"), choice("affected_side", "患侧", "左", "右", "双侧"), choice("episode_status", "病程状态", "新诊断", "保守康复中", "复评", "已结束"), number("symptom_duration_weeks", "症状时长（周）"), choice("diagnostic_confidence", "诊断把握度", "确诊", "高度怀疑", "待鉴别"), check("red_flag_present", "红旗/优先复评"), text("doctor", "主管医生"), text("therapist", "康复治疗师"), text("primary_activity", "主运动/工作负荷"), text("recent_load_change", "近期负荷变化"), number("activity_pain_vas", "指定负荷疼痛VAS"), text("pain_activity_description", "疼痛活动场景"), number("visa_p_total", "VISA-P总分"), choice("visa_p_completion_status", "VISA-P完成状态", "completed", "not completed"), choice("visa_p_respondent_source", "填写来源", "patient", "doctor-assisted", "therapist-assisted", "not completed"), text("target_sport", "目标运动"), choice("target_activity_level", "目标运动水平", "日常活动", "休闲运动", "校队/业余竞赛", "半职业", "职业/精英"), choice("return_to_activity_status", "重返活动状态", "未恢复", "恢复部分活动", "恢复目标运动但未达伤前水平", "恢复伤前水平"), number("week_no", "康复周次"), choice("phase", "康复阶段", "症状管理", "恢复", "重建", "重返活动"), number("supervised_sessions", "监督治疗次数"), number("home_training_days", "居家训练天数"), number("adherence_percent", "依从性（%）"), number("pain_during_load_nrs", "训练时疼痛NRS"), number("pain_24h_after_nrs", "训练后24小时疼痛NRS"), text("therapist_interpretation", "康复师解释"), text("warnings", "临床提示"), when("saved_at", "保存时间")), ("patient_id", "timepoint", "assessment_date")),
+    TableSpec("patients", "患者主表", (text("patient_id", "患者ID"), text("medical_record_no", "病历号"), text("name", "姓名"), choice("sex", "性别", "男", "女", "待确认"), when("birth_date", "出生日期"), number("height_cm", "身高（cm）"), number("weight_kg", "体重（kg）"), number("bmi", "BMI"), text("target_sport", "目标运动"), choice("target_activity_level", "目标运动水平", "日常活动", "休闲运动", "校队/业余竞赛", "半职业", "职业/精英"), choice("consent_status", "同意状态", "已同意", "未同意", "待确认")), ("patient_id",)),
+    # One row = one patient at one clinical follow-up time point.
+    TableSpec("assessments", "髌腱病评估表", (text("patient_id", "患者ID"), choice("timepoint", "评估节点", "基线", "6周", "12周", "6个月", "12个月"), when("assessment_date", "评估日期"), choice("affected_side", "患侧", "左", "右", "双侧"), choice("episode_status", "病程状态", "新诊断", "保守康复中", "复评", "已结束"), number("symptom_duration_weeks", "症状时长（周）"), choice("diagnostic_confidence", "诊断把握度", "确诊", "高度怀疑", "待鉴别"), check("red_flag_present", "红旗/优先复评"), text("doctor", "主管医生"), text("therapist", "康复治疗师"), text("primary_activity", "主运动/工作负荷"), text("recent_load_change", "近期负荷变化"), number("activity_pain_vas", "指定负荷疼痛VAS"), text("pain_activity_description", "疼痛活动场景"), number("visa_p_total", "VISA-P总分"), number("ultrasound_tendon_thickness_mm", "患侧髌腱厚度（mm）"), when("ultrasound_date", "超声检查日期"), text("ultrasound_note", "超声备注"), number("adherence_percent", "康复执行度（%）"), choice("phase", "康复阶段", "症状管理", "恢复", "重建", "重返活动"), choice("return_to_activity_status", "重返活动状态", "未恢复", "恢复部分活动", "恢复目标运动但未达伤前水平", "恢复伤前水平")), ("patient_id", "timepoint", "assessment_date")),
     TableSpec("rom", "ROM 综合评估", (text("patient_id", "患者ID"), choice("timepoint", "评估节点", "基线", "6周", "12周", "6个月", "12个月"), when("measured_at", "测量日期"), choice("affected_side", "患侧", "左", "右", "双侧"), choice("reference_knee_side", "健侧/对照侧", "左", "右"), choice("mode", "模式", "主动", "被动"), number("affected_knee_flexion_deg", "患侧膝屈曲（度）"), number("affected_knee_extension_deficit_deg", "患侧膝伸展受限（度）"), number("reference_knee_flexion_deg", "健侧膝屈曲（度）"), number("reference_knee_extension_deficit_deg", "健侧膝伸展受限（度）"), number("affected_hip_flexion_deg", "患侧髋屈曲（度）"), number("affected_hip_extension_deg", "患侧髋伸展（度）"), number("affected_hip_internal_rotation_deg", "患侧髋内旋（度）"), number("affected_hip_external_rotation_deg", "患侧髋外旋（度）"), number("affected_ankle_knee_to_wall_cm", "患侧踝膝靠墙（cm）"), choice("method", "测量方法", "量角器", "倾角仪", "目测", "其他"), text("assessor", "评估者")), ("patient_id", "timepoint", "measured_at")),
-    TableSpec("followup_summary", "患者随访总览", (text("patient_id", "患者ID"), when("baseline_date", "基线日期"), number("baseline_visa_p_total", "基线VISA-P"), number("baseline_activity_pain_vas", "基线VAS"), when("latest_date", "最近评估日期"), choice("latest_timepoint", "最近随访节点", "基线", "6周", "12周", "6个月", "12个月"), number("latest_visa_p_total", "最近VISA-P"), number("latest_activity_pain_vas", "最近VAS"), number("visa_p_change_from_baseline", "VISA-P较基线变化"), number("pain_change_from_baseline", "VAS较基线变化"), choice("return_to_activity_status", "重返活动状态", "未恢复", "恢复部分活动", "恢复目标运动但未达伤前水平", "恢复伤前水平"), choice("escalation_or_surgery", "升级治疗/手术", "无", "复评", "转诊", "已手术"), text("escalation_reason", "升级原因"), when("saved_at", "保存时间")), ("patient_id",)),
 )
 
 RETIRED_TABLE_NAMES = (
@@ -103,12 +101,13 @@ RETIRED_TABLE_NAMES = (
     "髌腱病康复记录",
     "髌腱病随访结局",
     "患者报告与病历文本",
+    "患者随访总览",
 )
 
 RETIRED_FIELD_NAMES_BY_TABLE = {
-    "髌腱病评估表": ("评估ID", "病程ID"),
+    "髌腱病评估表": ("评估ID", "病程ID", "保存时间", "VISA-P完成状态", "填写来源", "目标运动", "目标运动水平", "康复周次", "监督治疗次数", "居家训练天数", "训练时疼痛NRS", "训练后24小时疼痛NRS", "康复师解释", "临床提示"),
     "ROM 综合评估": ("ROM ID", "评估ID", "病程ID"),
-    "患者随访总览": ("病程ID",),
+    "患者主表": ("保存时间",),
 }
 SPEC_BY_KEY = {spec.key: spec for spec in TABLE_SPECS}
 
@@ -294,6 +293,36 @@ class FeishuBitableClient:
                     {"field_name": "患者ID", "type": field.get("type")},
                 )
                 removed.append(f"{table_name}·{field_name}（已转为患者ID主列）")
+        return removed
+
+    def prune_to_current_schema(self, app_token: str) -> list[str]:
+        """Keep one column for each current human-facing field and remove legacy duplicates.
+
+        This migration is only called by the explicit administrator action in the
+        deployed app.  A Feishu primary field is never deleted.
+        """
+        table_ids = {str(row.get("name")): str(row.get("table_id")) for row in self.list_tables(app_token)}
+        removed: list[str] = []
+        for spec in TABLE_SPECS:
+            table_id = table_ids.get(spec.name)
+            if not table_id:
+                continue
+            allowed = {field.name for field in spec.fields}
+            keep_ids: set[str] = set()
+            rows = self.list_fields(app_token, table_id)
+            for field_name in allowed:
+                matches = [row for row in rows if str(row.get("field_name")) == field_name]
+                if not matches:
+                    continue
+                selected = next((row for row in matches if row.get("is_primary")), matches[0])
+                keep_ids.add(str(selected.get("field_id")))
+            for row in rows:
+                field_id = str(row.get("field_id"))
+                field_name = str(row.get("field_name"))
+                if row.get("is_primary") or field_id in keep_ids:
+                    continue
+                self._request("DELETE", f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{field_id}")
+                removed.append(f"{spec.name}·{field_name}")
         return removed
 
     def upsert_record(self, app_token: str, table_id: str, table_key: str, record: dict[str, Any]) -> str:
