@@ -179,6 +179,27 @@ def numeric_or_none(value: object) -> float | None:
         return None
 
 
+def load_selected_timepoint() -> None:
+    """Prefill the editable VAS fields from the selected patient's saved node."""
+    patient_id = str(st.session_state.get("patient_id", "")).strip()
+    if not patient_id:
+        return
+    history, _ = saved_assessment_history(patient_id)
+    saved = selected_history_row(history, str(st.session_state.get("timepoint", "")))
+    if not saved:
+        return
+    vas = numeric_or_none(saved.get("activity_pain_vas"))
+    if vas is not None:
+        st.session_state.activity_pain_vas = vas
+    activity = str(saved.get("pain_activity_description", "")).strip()
+    if activity in PAIN_ACTIVITY_OPTIONS:
+        st.session_state.pain_activity_description = activity
+        st.session_state.pain_activity_other = ""
+    elif activity:
+        st.session_state.pain_activity_description = "其他"
+        st.session_state.pain_activity_other = activity
+
+
 def render_patient_history_strip(patient_id: str) -> None:
     if not patient_id:
         return
@@ -320,7 +341,7 @@ def answer_key(question: str) -> str:
 def render_visa_p() -> int | None:
     st.subheader("VISA-P 中文版")
     st.caption(f"来源版本：{VISA_P_SOURCE_VERSION}。共 8 项、总分 0–100；分数越高表示症状更轻、功能更好。")
-    st.selectbox("评估时间点", TIMEPOINTS, key="timepoint")
+    st.selectbox("评估时间点", TIMEPOINTS, key="timepoint", on_change=load_selected_timepoint)
     st.date_input("评估日期", key="assessment_date")
     patient_id = str(st.session_state.patient_id).strip()
     history, _ = saved_assessment_history(patient_id)
