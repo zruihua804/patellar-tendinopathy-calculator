@@ -170,6 +170,15 @@ def selected_history_row(history: list[dict[str, object]], timepoint: str) -> di
     return max(candidates, key=lambda row: _date_sort_value(row.get("assessment_date")))
 
 
+def numeric_or_none(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def render_patient_history_strip(patient_id: str) -> None:
     if not patient_id:
         return
@@ -510,7 +519,7 @@ def render_section_save(section: str) -> None:
 def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], list[str], object]:
     saved_current = selected_history_row(history, str(st.session_state.timepoint))
     entered_score = st.session_state.get("current_visa_p_total")
-    score = entered_score if entered_score is not None else (saved_current or {}).get("visa_p_total")
+    score = entered_score if entered_score is not None else numeric_or_none((saved_current or {}).get("visa_p_total"))
     status = visa_p_completion_status(st.session_state.get("current_visa_answers", {}))
     patient_id = st.session_state.patient_id or patient_id_from_record(st.session_state.medical_record_no, st.session_state.patient_name)
     pain_vas = float(st.session_state.activity_pain_vas)
