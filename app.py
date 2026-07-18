@@ -512,7 +512,10 @@ def saved_assessment_history(patient_id: str) -> tuple[list[dict[str, object]], 
         try:
             client = FeishuBitableClient(config)
             token = client.resolve_bitable_token()
-            table_id = client.existing_table_ids(token)["assessments"]
+            tables_by_name = {str(row.get("name")): str(row.get("table_id")) for row in client.list_tables(token)}
+            table_id = tables_by_name.get("髌腱病评估表")
+            if not table_id:
+                raise FeishuConfigurationError("飞书数据库缺少‘髌腱病评估表’；请先由管理员完成一次保存或结构初始化。")
             rows = [dict(item.get("fields", {})) for item in client.list_records(token, table_id)]
             patient_rows = [row for row in rows if str(row.get("患者ID", "")) == patient_id]
             st.session_state.feishu_history_cache = {"key": cache_key, "loaded_at": monotonic(), "rows": patient_rows}
