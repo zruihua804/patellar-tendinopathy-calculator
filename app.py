@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 import hashlib
 import hmac
+from time import monotonic
 import pandas as pd
 import streamlit as st
 
@@ -27,10 +28,11 @@ from storage import DEFAULT_STORAGE, DuplicateRecordError
 
 st.set_page_config(page_title="髌腱病临床计算器", page_icon="🦵", layout="wide")
 
-APP_RELEASE = "PT-v0.5.1-ultrasound-timepoints-2026-07-18"
+APP_RELEASE = "PT-v0.5.2-responsive-sync-2026-07-18"
 
 PRIMARY_LOAD_OPTIONS = ["跳跃/落地训练", "篮球", "排球", "羽毛球", "跑步", "足球", "网球/匹克球", "力量训练", "舞蹈/体操", "体力劳动", "久坐办公", "其他"]
 PAIN_ACTIVITY_OPTIONS = ["跳跃落地", "单腿跳/连续跳", "跑步加速或冲刺", "爬楼/下楼", "深蹲", "弓步/蹲起", "久坐后起立", "训练后", "其他"]
+HISTORY_CACHE_SECONDS = 20
 
 
 def init_state() -> None:
@@ -483,16 +485,38 @@ def _date_sort_value(value: object) -> pd.Timestamp:
     return pd.to_datetime(value, errors="coerce")
 
 
+def clear_patient_history_cache() -> None:
+    """Clear only this browser session's short-lived Feishu history snapshot."""
+
+    st.session_state.pop("feishu_history_cache", None)
+
+
 def saved_assessment_history(patient_id: str) -> tuple[list[dict[str, object]], str]:
-    """Use the user-owned Base for follow-up history, with local fallback in prototype mode."""
+    """Read follow-up history once per short UI interval, with local fallback.
+
+    Streamlit reruns the complete script for every widget interaction and also
+    renders every tab. Without this session cache, one slider drag can trigger
+    repeated token, table-schema, and record-list calls to Feishu, leaving the
+    interface in its grey loading state. Saves explicitly invalidate the cache.
+    """
     config = configured_feishu()
     if config and patient_id:
+        cache = st.session_state.get("feishu_history_cache")
+        cache_key = (config.app_id, config.source, patient_id)
+        if (
+            isinstance(cache, dict)
+            and cache.get("key") == cache_key
+            and monotonic() - float(cache.get("loaded_at", 0)) < HISTORY_CACHE_SECONDS
+        ):
+            return list(cache.get("rows", [])), "飞书多维表格（已刷新）"
         try:
             client = FeishuBitableClient(config)
             token = client.resolve_bitable_token()
-            table_id = client.ensure_schema(token)["assessments"]
+            table_id = client.existing_table_ids(token)["assessments"]
             rows = [dict(item.get("fields", {})) for item in client.list_records(token, table_id)]
-            return [row for row in rows if str(row.get("患者ID", "")) == patient_id], "飞书多维表格"
+            patient_rows = [row for row in rows if str(row.get("患者ID", "")) == patient_id]
+            st.session_state.feishu_history_cache = {"key": cache_key, "loaded_at": monotonic(), "rows": patient_rows}
+            return patient_rows, "飞书多维表格"
         except (FeishuConfigurationError, FeishuAPIError, ValueError):
             pass
     return [row for row in DEFAULT_STORAGE.list_records("assessments") if str(row.get("patient_id", "")) == patient_id], "本地原型记录"
@@ -561,6 +585,7 @@ def save_sections_to_feishu(records: dict[str, object], tables: list[str], succe
         table_ids = client.ensure_schema(token)
         for table in tables:
             client.upsert_record(token, table_ids[table], table, dict(records[table]))
+        clear_patient_history_cache()
         st.session_state.save_notice = success_message
         st.rerun()
     except (FeishuConfigurationError, FeishuAPIError, ValueError) as exc:

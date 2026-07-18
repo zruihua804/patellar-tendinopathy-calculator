@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from feishu_adapter import FeishuConfig, FeishuConfigurationError, SPEC_BY_KEY, format_record_fields
+from feishu_adapter import FeishuBitableClient, FeishuConfig, FeishuConfigurationError, SPEC_BY_KEY, format_record_fields
 
 
 class FeishuAdapterTests(unittest.TestCase):
@@ -19,6 +19,19 @@ class FeishuAdapterTests(unittest.TestCase):
     def test_assessment_identity_is_patient_and_timepoint(self):
         self.assertEqual(SPEC_BY_KEY["assessments"].unique_keys, ("patient_id", "timepoint"))
         self.assertEqual(SPEC_BY_KEY["rom"].unique_keys, ("patient_id", "timepoint"))
+
+    def test_existing_table_ids_is_read_only_and_requires_all_standard_tables(self):
+        config = FeishuConfig("app-id", "secret", "app-token")
+        client = FeishuBitableClient(config)
+        client.list_tables = lambda _: [
+            {"name": "患者主表", "table_id": "tbl-patients"},
+            {"name": "髌腱病评估表", "table_id": "tbl-assessments"},
+            {"name": "ROM 综合评估", "table_id": "tbl-rom"},
+        ]
+        self.assertEqual(
+            client.existing_table_ids("app-token"),
+            {"patients": "tbl-patients", "assessments": "tbl-assessments", "rom": "tbl-rom"},
+        )
 
     def test_formats_ultrasound_followup_fields(self):
         fields = format_record_fields(

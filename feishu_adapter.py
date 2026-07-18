@@ -217,6 +217,21 @@ class FeishuBitableClient:
             table_ids[spec.key] = table_id
         return table_ids
 
+    def existing_table_ids(self, app_token: str) -> dict[str, str]:
+        """Return the approved table IDs without checking or changing fields.
+
+        This is intentionally read-only and is used by the clinic interface on
+        normal reruns. Schema creation/repair remains an explicit save or admin
+        action so a slider change never triggers several Feishu schema calls.
+        """
+        existing = {str(row.get("name")): str(row.get("table_id")) for row in self.list_tables(app_token)}
+        missing = [spec.name for spec in TABLE_SPECS if spec.name not in existing]
+        if missing:
+            raise FeishuConfigurationError(
+                "飞书数据库缺少标准数据表：" + "、".join(missing) + "。请先由管理员完成一次保存或结构初始化。"
+            )
+        return {spec.key: existing[spec.name] for spec in TABLE_SPECS}
+
     def list_records(self, app_token: str, table_id: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         page_token = ""
