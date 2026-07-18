@@ -17,8 +17,8 @@ TABLE_FILES = {
 }
 UNIQUE_KEYS_BY_TABLE = {
     "patients": ("patient_id",),
-    "assessments": ("patient_id", "timepoint", "assessment_date"),
-    "rom": ("patient_id", "timepoint", "measured_at"),
+    "assessments": ("patient_id", "timepoint"),
+    "rom": ("patient_id", "timepoint"),
     "followup_summary": ("patient_id",),
 }
 

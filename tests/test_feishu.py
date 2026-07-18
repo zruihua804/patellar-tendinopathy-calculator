@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from feishu_adapter import FeishuConfig, FeishuConfigurationError, format_record_fields
+from feishu_adapter import FeishuConfig, FeishuConfigurationError, SPEC_BY_KEY, format_record_fields
 
 
 class FeishuAdapterTests(unittest.TestCase):
@@ -15,6 +15,25 @@ class FeishuAdapterTests(unittest.TestCase):
         self.assertEqual(fields["指定负荷疼痛VAS"], 3.5)
         self.assertEqual(fields["VISA-P总分"], 55.0)
         self.assertIsInstance(fields["评估日期"], int)
+
+    def test_assessment_identity_is_patient_and_timepoint(self):
+        self.assertEqual(SPEC_BY_KEY["assessments"].unique_keys, ("patient_id", "timepoint"))
+        self.assertEqual(SPEC_BY_KEY["rom"].unique_keys, ("patient_id", "timepoint"))
+
+    def test_formats_ultrasound_followup_fields(self):
+        fields = format_record_fields(
+            "assessments",
+            {
+                "patient_id": "PT-P-1",
+                "timepoint": "6周",
+                "ultrasound_tendon_thickness_mm": 5.2,
+                "ultrasound_date": date(2026, 8, 25),
+                "ultrasound_note": "同一测量位置复查",
+            },
+        )
+        self.assertEqual(fields["患侧髌腱厚度（mm）"], 5.2)
+        self.assertIsInstance(fields["超声检查日期"], int)
+        self.assertEqual(fields["超声备注"], "同一测量位置复查")
 
     def test_formats_wide_rom_fields(self):
         fields = format_record_fields(

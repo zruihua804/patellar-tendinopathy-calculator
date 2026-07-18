@@ -74,6 +74,12 @@ class SyntheticWorkflowTests(unittest.TestCase):
             self.assertEqual(len(saved_assessment), 1)
             self.assertEqual(saved_assessment.loc[0, "visa_p_total"], "92")
 
+            later_same_node = {**records["assessments"], "assessment_date": date(2026, 7, 21), "ultrasound_tendon_thickness_mm": 5.2}
+            self.assertEqual(store.upsert_record("assessments", later_same_node)[0], "updated")
+            saved_assessment = pd.read_csv(Path(directory) / TABLE_FILES["assessments"], dtype=object)
+            self.assertEqual(len(saved_assessment), 1)
+            self.assertEqual(saved_assessment.loc[0, "ultrasound_tendon_thickness_mm"], "5.2")
+
 
 if __name__ == "__main__":
     unittest.main()

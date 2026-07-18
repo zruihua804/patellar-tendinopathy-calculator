@@ -27,7 +27,7 @@ from storage import DEFAULT_STORAGE, DuplicateRecordError
 
 st.set_page_config(page_title="髌腱病临床计算器", page_icon="🦵", layout="wide")
 
-APP_RELEASE = "PT-v0.5-longitudinal-outcomes-2026-07-17"
+APP_RELEASE = "PT-v0.5.1-ultrasound-timepoints-2026-07-18"
 
 PRIMARY_LOAD_OPTIONS = ["跳跃/落地训练", "篮球", "排球", "羽毛球", "跑步", "足球", "网球/匹克球", "力量训练", "舞蹈/体操", "体力劳动", "久坐办公", "其他"]
 PAIN_ACTIVITY_OPTIONS = ["跳跃落地", "单腿跳/连续跳", "跑步加速或冲刺", "爬楼/下楼", "深蹲", "弓步/蹲起", "久坐后起立", "训练后", "其他"]
@@ -55,6 +55,7 @@ def init_state() -> None:
         "recent_load_change": "未记录",
         "assessment_date": date.today(),
         "timepoint": "基线",
+        "ultrasound_timepoint": "基线",
         "source_role": "doctor-assisted",
         "activity_pain_vas": 3.0,
         "pain_activity_description": "跳跃落地",
@@ -200,6 +201,25 @@ def load_selected_timepoint() -> None:
         st.session_state.pain_activity_other = activity
 
 
+def load_selected_ultrasound_timepoint() -> None:
+    """Load the saved ultrasound fields for the node selected in the ultrasound card."""
+    patient_id = str(st.session_state.get("patient_id", "")).strip()
+    if not patient_id:
+        return
+    history, _ = saved_assessment_history(patient_id)
+    saved = selected_history_row(history, str(st.session_state.get("ultrasound_timepoint", "")))
+    if not saved:
+        st.session_state.ultrasound_tendon_thickness_mm = 0.0
+        st.session_state.ultrasound_date = date.today()
+        st.session_state.ultrasound_note = ""
+        return
+    thickness = numeric_or_none(saved.get("ultrasound_tendon_thickness_mm"))
+    st.session_state.ultrasound_tendon_thickness_mm = thickness if thickness is not None else 0.0
+    saved_date = _date_sort_value(saved.get("ultrasound_date"))
+    st.session_state.ultrasound_date = saved_date.date() if not pd.isna(saved_date) else date.today()
+    st.session_state.ultrasound_note = str(saved.get("ultrasound_note", ""))
+
+
 def render_patient_history_strip(patient_id: str) -> None:
     if not patient_id:
         return
@@ -213,10 +233,12 @@ def render_patient_history_strip(patient_id: str) -> None:
         if row:
             visa = row.get("visa_p_total") if row.get("visa_p_total") not in (None, "") else "—"
             vas = row.get("activity_pain_vas") if row.get("activity_pain_vas") not in (None, "") else "—"
-            rows.append({"节点": point, "状态": "已记录", "VISA-P": visa, "VAS": vas, "日期": row.get("assessment_date", "")})
+            thickness = numeric_or_none(row.get("ultrasound_tendon_thickness_mm"))
+            ultrasound = "—" if thickness is None else f"{thickness:.1f} mm"
+            rows.append({"节点": point, "状态": "已记录", "VISA-P": visa, "VAS": vas, "肌骨超声": ultrasound, "日期": row.get("assessment_date", "")})
         else:
-            rows.append({"节点": point, "状态": "未记录", "VISA-P": "—", "VAS": "—", "日期": ""})
-    st.caption("患者历史概览（选择随访节点后会显示对应的已保存评分）")
+            rows.append({"节点": point, "状态": "未记录", "VISA-P": "—", "VAS": "—", "肌骨超声": "—", "日期": ""})
+    st.caption("患者历史概览（选择节点后，可更新该节点的评分、ROM 或肌骨超声）")
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
@@ -324,14 +346,40 @@ def render_patient_entry() -> None:
         st.text_input("近期负荷变化", key="recent_load_change")
         st.text_input("主管医生", key="doctor")
         st.text_input("康复治疗师", key="therapist")
-        st.number_input("患侧髌腱厚度（mm）", min_value=0.0, max_value=20.0, step=0.1, key="ultrasound_tendon_thickness_mm", help="建议使用团队统一的超声测量位置；该指标用于影像背景记录，不直接计算恢复概率。")
-        st.date_input("超声检查日期", key="ultrasound_date")
-        st.text_input("超声备注（可选）", key="ultrasound_note", placeholder="如测量位置、低回声或血流描述")
         st.checkbox("红旗或需要优先排除的情况（疑似断裂、伸膝无力、全身症状、明显积血/锁定等）", key="red_flag_present")
     if not st.session_state.patient_id and st.session_state.medical_record_no:
         if st.button("根据病历号生成患者 ID"):
             st.session_state.patient_id = patient_id_from_record(st.session_state.medical_record_no, st.session_state.patient_name)
             st.rerun()
+
+
+def render_ultrasound_followup() -> None:
+    st.subheader("肌骨超声随访")
+    st.caption("可单独选择基线、6周、12周等节点。保存时只更新该患者该节点的超声字段，不会新增重复行或改动其他节点的评分。")
+    patient_id = str(st.session_state.patient_id).strip()
+    if not patient_id:
+        st.info("请先填写或查询患者 ID，再保存肌骨超声。")
+    st.selectbox("肌骨超声所属评估节点", TIMEPOINTS, key="ultrasound_timepoint", on_change=load_selected_ultrasound_timepoint)
+    history, _ = saved_assessment_history(patient_id)
+    saved = selected_history_row(history, str(st.session_state.ultrasound_timepoint)) if patient_id else None
+    if saved and numeric_or_none(saved.get("ultrasound_tendon_thickness_mm")) is not None:
+        saved_thickness = numeric_or_none(saved.get("ultrasound_tendon_thickness_mm"))
+        st.info(f"已保存的{st.session_state.ultrasound_timepoint}肌骨超声：患侧髌腱厚度 {saved_thickness:.1f} mm。重新保存将更新该节点。")
+    left, right = st.columns(2)
+    with left:
+        st.number_input("患侧髌腱厚度（mm）", min_value=0.0, max_value=20.0, step=0.1, key="ultrasound_tendon_thickness_mm", help="建议在同一测量位置复查；该指标用于治疗前后结构对比，不单独代表症状或功能。")
+    with right:
+        st.date_input("超声检查日期", key="ultrasound_date")
+    st.text_input("超声备注（可选）", key="ultrasound_note", placeholder="如测量位置、低回声、血流或检查者描述")
+    record = {
+        "patient_id": patient_id,
+        "timepoint": st.session_state.ultrasound_timepoint,
+        "ultrasound_tendon_thickness_mm": st.session_state.ultrasound_tendon_thickness_mm or None,
+        "ultrasound_date": st.session_state.ultrasound_date,
+        "ultrasound_note": st.session_state.ultrasound_note,
+    }
+    if st.button("保存该节点肌骨超声并同步飞书", type="primary", key="save_ultrasound_section"):
+        save_sections_to_feishu({"assessments": record}, ["assessments"], f"{st.session_state.ultrasound_timepoint} 的肌骨超声已保存。")
 
 
 def answer_key(question: str) -> str:
@@ -341,7 +389,7 @@ def answer_key(question: str) -> str:
 def render_visa_p() -> int | None:
     st.subheader("VISA-P 中文版")
     st.caption(f"来源版本：{VISA_P_SOURCE_VERSION}。共 8 项、总分 0–100；分数越高表示症状更轻、功能更好。")
-    st.selectbox("评估时间点", TIMEPOINTS, key="timepoint", on_change=load_selected_timepoint)
+    st.caption(f"当前评估节点：{st.session_state.timepoint}。切换节点请使用页面顶部的‘本次随访评估节点’。")
     st.date_input("评估日期", key="assessment_date")
     patient_id = str(st.session_state.patient_id).strip()
     history, _ = saved_assessment_history(patient_id)
@@ -460,15 +508,16 @@ def normalise_history_row(row: dict[str, object]) -> dict[str, object]:
         "assessment_date": first_present(row.get("assessment_date"), row.get("评估日期")),
         "visa_p_total": first_present(row.get("visa_p_total"), row.get("VISA-P总分")),
         "activity_pain_vas": first_present(row.get("activity_pain_vas"), row.get("指定负荷疼痛VAS"), row.get("activity_pain_nrs"), row.get("指定负荷疼痛NRS")),
+        "ultrasound_tendon_thickness_mm": first_present(row.get("ultrasound_tendon_thickness_mm"), row.get("患侧髌腱厚度（mm）")),
+        "ultrasound_date": first_present(row.get("ultrasound_date"), row.get("超声检查日期")),
+        "ultrasound_note": first_present(row.get("ultrasound_note"), row.get("超声备注")),
         "return_to_activity_status": first_present(row.get("return_to_activity_status"), row.get("重返活动状态")),
     }
 
 
 def with_current_assessment(history: list[dict[str, object]], current: dict[str, object]) -> list[dict[str, object]]:
-    def natural_key(row: dict[str, object]) -> tuple[str, str, str]:
-        parsed_date = _date_sort_value(row["assessment_date"])
-        date_key = parsed_date.date().isoformat() if not pd.isna(parsed_date) else str(row["assessment_date"])
-        return str(row["patient_id"]), str(row["timepoint"]), date_key
+    def natural_key(row: dict[str, object]) -> tuple[str, str]:
+        return str(row["patient_id"]), str(row["timepoint"])
 
     current_key = natural_key(normalise_history_row(current))
     merged = [
@@ -524,9 +573,9 @@ def render_section_save(section: str) -> None:
     records, _, _ = build_records(history)
     if section == "initial":
         assessment = records["assessments"]
-        records["assessments"] = {key: assessment[key] for key in ("patient_id", "timepoint", "assessment_date", "affected_side", "episode_status", "symptom_duration_weeks", "diagnostic_confidence", "red_flag_present", "doctor", "therapist", "primary_activity", "recent_load_change", "ultrasound_tendon_thickness_mm", "ultrasound_date", "ultrasound_note")}
-        if st.button("保存首诊资料并同步飞书", type="primary", key="save_initial_section"):
-            save_sections_to_feishu(records, ["patients", "assessments"], "首诊资料已保存；可继续填写评分与 ROM。")
+        records["assessments"] = {key: assessment[key] for key in ("patient_id", "timepoint", "assessment_date", "affected_side", "episode_status", "symptom_duration_weeks", "diagnostic_confidence", "red_flag_present", "doctor", "therapist", "primary_activity", "recent_load_change")}
+        if st.button("保存本节点临床资料并同步飞书", type="primary", key="save_initial_section"):
+            save_sections_to_feishu(records, ["patients", "assessments"], f"{st.session_state.timepoint} 的临床资料已保存；可继续填写评分、ROM 或肌骨超声。")
     elif section == "scores":
         assessment = records["assessments"]
         records["assessments"] = {key: assessment[key] for key in ("patient_id", "timepoint", "assessment_date", "activity_pain_vas", "pain_activity_description", "visa_p_total", "adherence_percent", "phase", "return_to_activity_status")}
@@ -567,9 +616,9 @@ def build_records(history: list[dict[str, object]]) -> tuple[dict[str, object], 
         "week_no": st.session_state.rehab_week_no,
         "phase": st.session_state.rehab_phase,
         "adherence_percent": st.session_state.adherence_percent,
-        "ultrasound_tendon_thickness_mm": st.session_state.ultrasound_tendon_thickness_mm or None,
-        "ultrasound_date": st.session_state.ultrasound_date,
-        "ultrasound_note": st.session_state.ultrasound_note,
+        "ultrasound_tendon_thickness_mm": numeric_or_none((saved_current or {}).get("ultrasound_tendon_thickness_mm")),
+        "ultrasound_date": (saved_current or {}).get("ultrasound_date", ""),
+        "ultrasound_note": (saved_current or {}).get("ultrasound_note", ""),
     }
     merged_history = with_current_assessment(history, assessment)
     baseline_visa, baseline_pain = baseline_for(merged_history, assessment)
@@ -609,20 +658,36 @@ def render_followup_charts(history: list[dict[str, object]]) -> None:
     if not history:
         st.info("首次保存后，这里会自动出现 VISA-P 与 VAS 的随访曲线。")
         return
-    frame = pd.DataFrame(history)
-    frame["评估日期"] = frame["assessment_date"].map(_date_sort_value)
-    frame["visa_p_total"] = pd.to_numeric(frame["visa_p_total"], errors="coerce")
-    frame["activity_pain_vas"] = pd.to_numeric(frame["activity_pain_vas"], errors="coerce")
-    frame = frame.dropna(subset=["评估日期"]).sort_values("评估日期")
+    all_records = pd.DataFrame(history)
+    all_records["评估日期"] = all_records["assessment_date"].map(_date_sort_value)
+    all_records["超声日期"] = all_records["ultrasound_date"].map(_date_sort_value)
+    all_records["visa_p_total"] = pd.to_numeric(all_records["visa_p_total"], errors="coerce")
+    all_records["activity_pain_vas"] = pd.to_numeric(all_records["activity_pain_vas"], errors="coerce")
+    all_records["ultrasound_tendon_thickness_mm"] = pd.to_numeric(all_records["ultrasound_tendon_thickness_mm"], errors="coerce")
+    frame = all_records.dropna(subset=["评估日期"]).sort_values("评估日期")
     st.markdown("#### 已保存随访趋势")
-    visa_col, vas_col = st.columns(2)
+    visa_col, vas_col, ultrasound_col = st.columns(3)
     with visa_col:
         st.caption("VISA-P：越高表示功能越好")
-        st.line_chart(frame.set_index("评估日期")[["visa_p_total"]], height=230)
+        if frame.dropna(subset=["visa_p_total"]).empty:
+            st.info("尚无已完成的 VISA-P。")
+        else:
+            st.line_chart(frame.set_index("评估日期")[["visa_p_total"]], height=230)
     with vas_col:
         st.caption("指定负荷疼痛 VAS：越低越好")
-        st.line_chart(frame.set_index("评估日期")[["activity_pain_vas"]], height=230)
-    st.dataframe(frame[["timepoint", "assessment_date", "visa_p_total", "activity_pain_vas", "return_to_activity_status"]], hide_index=True, use_container_width=True)
+        if frame.dropna(subset=["activity_pain_vas"]).empty:
+            st.info("尚无已保存的 VAS。")
+        else:
+            st.line_chart(frame.set_index("评估日期")[["activity_pain_vas"]], height=230)
+    with ultrasound_col:
+        st.caption("患侧髌腱厚度（mm）：结构随访对比")
+        ultrasound_frame = all_records.dropna(subset=["超声日期", "ultrasound_tendon_thickness_mm"]).sort_values("超声日期")
+        if ultrasound_frame.empty:
+            st.info("尚无已保存的肌骨超声。")
+        else:
+            st.line_chart(ultrasound_frame.set_index("超声日期")[["ultrasound_tendon_thickness_mm"]], height=230)
+    st.caption("超声厚度用于同一测量方案下的结构性治疗前后对比，应结合症状、功能和临床检查解释。")
+    st.dataframe(all_records[["timepoint", "assessment_date", "visa_p_total", "activity_pain_vas", "ultrasound_tendon_thickness_mm", "ultrasound_date", "return_to_activity_status"]], hide_index=True, use_container_width=True)
 
 
 def render_return_to_sport_bars(regular_percent: int, incomplete_percent: int) -> None:
@@ -744,9 +809,13 @@ def main() -> None:
     render_sidebar()
     st.title("髌腱病评估、康复分层与随访")
     st.caption("先录入临床资料，再完成 VISA-P、康复评估、趋势解释与安全保存。")
+    st.selectbox("本次随访评估节点", TIMEPOINTS, key="timepoint", on_change=load_selected_timepoint, help="此选择同时用于临床资料、VISA-P、ROM 与报告；每位患者在每个节点只保留一条综合记录。")
     tabs = st.tabs(["① 首诊资料", "② VISA-P", "③ 康复评估", "④ 报告与保存"])
     with tabs[0]:
         render_patient_entry()
+        st.divider()
+        render_ultrasound_followup()
+        st.divider()
         render_section_save("initial")
     with tabs[1]:
         render_visa_p()
